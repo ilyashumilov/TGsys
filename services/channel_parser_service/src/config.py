@@ -45,12 +45,15 @@ class TelegramConfig:
     def from_env(cls) -> "TelegramConfig":
         api_id_raw = os.getenv("TRACKER_API_ID", "")
         api_hash = os.getenv("TRACKER_API_HASH", "")
-        session_path = os.getenv("TELEGRAM_SESSION_PATH", "/sessions/telegram.session")
+        api_id = int(api_id_raw) if api_id_raw else 0
+        
+        # Generate session path using API_ID
+        default_session_path = f"/sessions/{api_id}_session.session"
+        session_path = os.getenv("TELEGRAM_SESSION_PATH", default_session_path)
 
         if not api_id_raw or not api_hash:
             raise RuntimeError("Missing TRACKER_API_ID / TRACKER_API_HASH in environment")
 
-        api_id = int(api_id_raw)
         return cls(api_id=api_id, api_hash=api_hash, session_path=session_path)
 
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from postgres.client import BaseRepository, PostgresClient
+from custom_clients.postgres_client import BaseRepository, PostgresClient
 
 
 @dataclass(frozen=True)

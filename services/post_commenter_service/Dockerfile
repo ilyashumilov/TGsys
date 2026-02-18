@@ -13,4 +13,3 @@ COPY custom_clients ./custom_clients
 COPY src ./src
 
 CMD ["python", "src/main.py"]
-

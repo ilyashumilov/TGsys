@@ -9,9 +9,15 @@ CREATE TABLE IF NOT EXISTS telegram_channels (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Insert sample channels (will be ignored if they already exist)
+INSERT INTO telegram_channels (identifier) VALUES 
+  ('@durov'),
+  ('@telegram')
+ON CONFLICT (identifier) DO NOTHING;
+
 -- Update updated_at automatically (simple approach: update it in app)
 
--- Example channels (edit identifiers to your channels, then restart postgres volume or insert manually):
--- INSERT INTO telegram_channels (identifier) VALUES ('@somechannel');
--- INSERT INTO telegram_channels (identifier) VALUES ('https://t.me/somechannel');
+-- You can add more channels like this:
+-- INSERT INTO telegram_channels (identifier) VALUES ('@yourchannel');
+-- INSERT INTO telegram_channels (identifier) VALUES ('https://t.me/yourchannel');
 

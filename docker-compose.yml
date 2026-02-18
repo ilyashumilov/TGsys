@@ -46,7 +46,6 @@ services:
       KAFKA_BROKER: "kafka:${KAFKA_PORT}"
       KAFKA_TOPIC: "telegram-last-post"
       POSTGRES_HOST: "postgres"
-      TELEGRAM_SESSION_PATH: "/sessions/telegram.session"
     volumes:
       - ./sessions:/sessions
     command: sh -c "sleep 20 && python src/main.py"
@@ -62,6 +61,19 @@ services:
       KAFKA_TOPIC: "telegram-last-post"
       KAFKA_CONSUMER_START_DELAY: "20"
     command: python src/logger_consumer.py
+
+  post_commenter_service:
+    build: ./services/post_commenter_service
+    container_name: post_commenter_service
+    env_file: .env
+    depends_on:
+      - kafka
+    environment:
+      KAFKA_BROKER: "kafka:${KAFKA_PORT}"
+      KAFKA_TOPIC: "telegram-last-post"
+      KAFKA_CONSUMER_GROUP: "post-commenter-group"
+      KAFKA_CONSUMER_START_DELAY: "25"
+      LOG_LEVEL: "INFO"
 
 volumes:
   postgres_data:

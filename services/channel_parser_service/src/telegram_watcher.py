@@ -1,16 +1,19 @@
 from __future__ import annotations
 
+import logging
 import os
+import shutil
 import time
 from dataclasses import dataclass
 from typing import Any
 
 from telethon import utils
 from telethon.sync import TelegramClient
+from telethon.errors import ChannelPrivateError, ChatAdminRequiredError, FloodWaitError
 
 from channel_repository import ChannelRepository, TrackedChannel
 from config import TelegramConfig
-from kafka.client import KafkaProducerClient
+from custom_clients.kafka_client import KafkaConfig, KafkaProducerClient
 
 
 class TelegramSessionManager:
@@ -24,6 +27,19 @@ class TelegramSessionManager:
     def telethon_session_name(self) -> str:
         # Telethon appends ".session" for string session names, so strip it if provided.
         return self._session_path[:-8] if self._session_path.endswith(".session") else self._session_path
+
+    def prepare_writable_session_name(self, runtime_dir: str = "/tmp") -> str:
+        expected_file = (
+            self._session_path if self._session_path.endswith(".session") else f"{self._session_path}.session"
+        )
+        self.assert_session_exists()
+
+        os.makedirs(runtime_dir, exist_ok=True)
+        runtime_session_file = os.path.join(runtime_dir, os.path.basename(expected_file))
+        shutil.copy2(expected_file, runtime_session_file)
+
+        # Return name without ".session" because Telethon will append it.
+        return runtime_session_file[:-8] if runtime_session_file.endswith(".session") else runtime_session_file
 
     def assert_session_exists(self) -> None:
         expected_file = (
@@ -40,9 +56,16 @@ class TelegramSessionManager:
 class LastPostEvent:
     tg_channel_id: int
     message_id: int
+    channel_identifier: str
+    timestamp: int
 
     def to_payload(self) -> dict[str, Any]:
-        return {"channel_id": self.tg_channel_id, "message_id": self.message_id}
+        return {
+            "channel_id": self.tg_channel_id,
+            "message_id": self.message_id,
+            "channel_identifier": self.channel_identifier,
+            "timestamp": self.timestamp
+        }
 
 
 class TelegramChannelWatcher:
@@ -64,13 +87,14 @@ class TelegramChannelWatcher:
         self._session = TelegramSessionManager(tg_config.session_path)
 
         self._channel_id_by_peer: dict[int, int] = {}
-        self._entity_by_channel_row_id: dict[int, object] = {}
+        self._entity_by_channel_row_id: dict[int, Any] = {}
+        self._logger = logging.getLogger(__name__)
 
     def _publish(self, event: LastPostEvent) -> None:
         key = str(event.tg_channel_id)
         self._producer.send_json(key=key, payload=event.to_payload())
 
-    def _resolve_channel(self, client: TelegramClient, ch: TrackedChannel) -> tuple[int, object]:
+    def _resolve_channel(self, client: TelegramClient, ch: TrackedChannel) -> tuple[int, Any]:
         """
         Resolve DB channel identifier to a Telethon entity + stable peer id.
         """
@@ -89,26 +113,53 @@ class TelegramChannelWatcher:
         return peer_id, entity
 
     def _tick_once(self, client: TelegramClient) -> None:
+        """Process all active channels and publish new messages."""
         channels = self._repo.list_active()
+        if not channels:
+            self._logger.debug("No active channels to process")
+            return
+            
+        self._logger.debug(f"Processing {len(channels)} channels")
+            
         for ch in channels:
             try:
                 peer_id, entity = self._resolve_channel(client, ch)
-                last_msg = client.get_messages(entity, limit=1)
-                if not last_msg:
+                messages = client.get_messages(entity, limit=1)
+                
+                if not messages:
+                    self._logger.debug(f"No messages found for channel {ch.identifier}")
                     continue
 
-                latest_message_id = int(last_msg[0].id)
+                latest_message_id = int(messages[0].id)
+                message_timestamp = int(messages[0].date.timestamp())
+                
+                self._logger.debug(f"Channel {ch.identifier}: latest={latest_message_id}, tracked={ch.last_message_id}")
+                
                 if latest_message_id > ch.last_message_id:
-                    self._publish(LastPostEvent(tg_channel_id=peer_id, message_id=latest_message_id))
+                    event = LastPostEvent(
+                        tg_channel_id=peer_id, 
+                        message_id=latest_message_id,
+                        channel_identifier=ch.identifier,
+                        timestamp=message_timestamp
+                    )
+                    self._publish(event)
                     self._repo.set_last_message_id(channel_id=ch.id, last_message_id=latest_message_id)
+                    self._logger.info(f"Published new message for channel {ch.identifier}: {latest_message_id}")
+                else:
+                    self._logger.debug(f"No new messages for channel {ch.identifier}")
+                    
+            except FloodWaitError as e:
+                self._logger.warning(f"Flood wait for channel {ch.identifier!r}: {e.seconds}s")
+                time.sleep(e.seconds)
+            except (ChannelPrivateError, ChatAdminRequiredError) as e:
+                self._logger.error(f"Access denied for channel {ch.identifier!r}: {e}")
             except Exception as exc:
-                print(f"[telegram] tick error for {ch.identifier!r}: {exc}")
+                self._logger.error(f"Error processing channel {ch.identifier!r}: {exc}", exc_info=True)
 
     def run(self) -> None:
-        self._session.assert_session_exists()
-
-        session_name = self._session.telethon_session_name()
-        print("[telegram] starting client...")
+        """Main execution loop for watching Telegram channels."""
+        session_name = self._session.prepare_writable_session_name()
+        self._logger.info("Starting Telegram client...")
 
         with TelegramClient(session_name, self._tg_config.api_id, self._tg_config.api_hash) as client:
             if not client.is_user_authorized():
@@ -116,9 +167,19 @@ class TelegramChannelWatcher:
                     "Telegram client is not authorized. Provide a valid authorized session file."
                 )
 
-            print("[telegram] polling for last posts...")
+            self._logger.info("Client authorized, starting to poll for new posts...")
+            
+            # Initial tick to warm up caches
             self._tick_once(client)
+            
             while True:
-                self._tick_once(client)
+                try:
+                    self._tick_once(client)
+                except KeyboardInterrupt:
+                    self._logger.info("Received interrupt signal, shutting down...")
+                    break
+                except Exception as exc:
+                    self._logger.error(f"Unexpected error in main loop: {exc}", exc_info=True)
+                    
                 time.sleep(self._tick_seconds)
 
