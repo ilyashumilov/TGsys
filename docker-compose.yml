@@ -35,31 +35,33 @@ services:
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
 
-  # service-a:
-  #   build: ./services/service-a
-  #   container_name: service-a
-  #   env_file: .env
-  #   ports:
-  #     - "${SERVICE_A_PORT}:${SERVICE_A_PORT}"
-  #   environment:
-  #     POSTGRES_URL: "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:${POSTGRES_PORT}/${POSTGRES_DB}"
-  #     KAFKA_BROKER: "kafka:${KAFKA_PORT}"
-  #   depends_on:
-  #     - postgres
-  #     - kafka
+  channel_parser_service:
+    build: ./services/channel_parser_service
+    container_name: channel_parser_service
+    env_file: .env
+    depends_on:
+      - kafka
+      - postgres
+    environment:
+      KAFKA_BROKER: "kafka:${KAFKA_PORT}"
+      KAFKA_TOPIC: "telegram-last-post"
+      POSTGRES_HOST: "postgres"
+      TELEGRAM_SESSION_PATH: "/sessions/telegram.session"
+    volumes:
+      - ./sessions:/sessions
+    command: sh -c "sleep 20 && python src/main.py"
 
-  # service-b:
-  #   build: ./services/service-b
-  #   container_name: service-b
-  #   env_file: .env
-  #   ports:
-  #     - "${SERVICE_B_PORT}:${SERVICE_B_PORT}"
-  #   environment:
-  #     POSTGRES_URL: "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:${POSTGRES_PORT}/${POSTGRES_DB}"
-  #     KAFKA_BROKER: "kafka:${KAFKA_PORT}"
-  #   depends_on:
-  #     - postgres
-  #     - kafka
+  kafka_logger:
+    build: ./services/channel_parser_service
+    container_name: kafka_logger
+    env_file: .env
+    depends_on:
+      - kafka
+    environment:
+      KAFKA_BROKER: "kafka:${KAFKA_PORT}"
+      KAFKA_TOPIC: "telegram-last-post"
+      KAFKA_CONSUMER_START_DELAY: "20"
+    command: python src/logger_consumer.py
 
 volumes:
   postgres_data:
