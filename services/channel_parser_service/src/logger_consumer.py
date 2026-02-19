@@ -28,23 +28,8 @@ class LoggingConsumerApp:
         for message in self._consumer:
             topic = message.topic
             raw_value = message.value
-            text = self._format_value(raw_value)
             
-            try:
-                parsed = json.loads(raw_value)
-                channel_id = parsed.get('channel_id', 'unknown')
-                message_id = parsed.get('message_id', 'unknown')
-                channel_identifier = parsed.get('channel_identifier', 'unknown')
-                timestamp = parsed.get('timestamp', 'unknown')
-                
-                print(f"📨 New post detected:")
-                print(f"   Channel: {channel_identifier} (ID: {channel_id})")
-                print(f"   Message ID: {message_id}")
-                print(f"   Timestamp: {timestamp}")
-                print(f"   Raw: {text}")
-                print("-" * 50)
-            except Exception:
-                print(f"message received {topic}: {text}")
+            print(f"{topic};{raw_value}")
 
 
 def main() -> None:

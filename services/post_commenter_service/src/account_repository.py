@@ -11,13 +11,19 @@ from custom_clients.postgres_client import BaseRepository, PostgresClient
 @dataclass(frozen=True)
 class TelegramAccount:
     id: int
-    api_id: int
-    api_hash: str
+    account_name: str
+    user_id: Optional[int]
+    first_name: Optional[str]
+    last_name: Optional[str]
+    username: Optional[str]
     phone_number: Optional[str]
+    session_file: str
     is_active: bool
     last_comment_at: Optional[datetime]
-    cooldown_until: Optional[datetime]
+    comments_count: int
+    health_score: int
     session_status: str
+    proxy_id: Optional[int]
     proxy_type: Optional[str]
     proxy_host: Optional[str]
     proxy_port: Optional[int]
@@ -37,14 +43,15 @@ class AccountRepository(BaseRepository):
     def get_active_accounts(self) -> List[TelegramAccount]:
         """Get all active and authorized accounts not in cooldown."""
         query = """
-            SELECT id, api_id, api_hash, phone_number, is_active, 
-                   last_comment_at, cooldown_until, session_status,
-                   proxy_type, proxy_host, proxy_port, proxy_username, proxy_password,
+            SELECT id, account_name, user_id, first_name, last_name, username, phone_number, session_file,
+                   is_active, last_comment_time, comments_count, health_score, session_status,
+                   proxy_id, proxy_type, proxy_host, proxy_port, proxy_username, proxy_password,
                    created_at, updated_at
             FROM telegram_accounts 
             WHERE is_active = TRUE 
               AND session_status = 'authorized'
-              AND (cooldown_until IS NULL OR cooldown_until <= NOW())
+              AND health_score > 70
+              AND (last_comment_time IS NULL OR last_comment_time <= NOW() - INTERVAL '1 hour')
             ORDER BY RANDOM()
         """
         
@@ -52,13 +59,19 @@ class AccountRepository(BaseRepository):
         return [
             TelegramAccount(
                 id=row["id"],
-                api_id=row["api_id"],
-                api_hash=row["api_hash"],
+                account_name=row["account_name"],
+                user_id=row["user_id"],
+                first_name=row["first_name"],
+                last_name=row["last_name"],
+                username=row["username"],
                 phone_number=row["phone_number"],
+                session_file=row["session_file"],
                 is_active=row["is_active"],
-                last_comment_at=row["last_comment_at"],
-                cooldown_until=row["cooldown_until"],
+                last_comment_at=row["last_comment_time"],
+                comments_count=row["comments_count"],
+                health_score=row["health_score"],
                 session_status=row["session_status"],
+                proxy_id=row["proxy_id"],
                 proxy_type=row["proxy_type"],
                 proxy_host=row["proxy_host"],
                 proxy_port=row["proxy_port"],
@@ -73,24 +86,36 @@ class AccountRepository(BaseRepository):
     def get_all_accounts(self) -> List[TelegramAccount]:
         """Get all accounts for status checking."""
         query = """
-            SELECT id, api_id, api_hash, phone_number, is_active, 
-                   last_comment_at, cooldown_until, session_status,
+            SELECT id, account_name, user_id, first_name, last_name, username, phone_number, session_file,
+                   is_active, last_comment_time, comments_count, health_score, session_status,
+                   proxy_id, proxy_type, proxy_host, proxy_port, proxy_username, proxy_password,
                    created_at, updated_at
             FROM telegram_accounts 
-            ORDER BY api_id
+            ORDER BY account_name
         """
         
         results = self._db.fetch_all(query)
         return [
             TelegramAccount(
                 id=row["id"],
-                api_id=row["api_id"],
-                api_hash=row["api_hash"],
+                account_name=row["account_name"],
+                user_id=row["user_id"],
+                first_name=row["first_name"],
+                last_name=row["last_name"],
+                username=row["username"],
                 phone_number=row["phone_number"],
+                session_file=row["session_file"],
                 is_active=row["is_active"],
-                last_comment_at=row["last_comment_at"],
-                cooldown_until=row["cooldown_until"],
+                last_comment_at=row["last_comment_time"],
+                comments_count=row["comments_count"],
+                health_score=row["health_score"],
                 session_status=row["session_status"],
+                proxy_id=row["proxy_id"],
+                proxy_type=row["proxy_type"],
+                proxy_host=row["proxy_host"],
+                proxy_port=row["proxy_port"],
+                proxy_username=row["proxy_username"],
+                proxy_password=row["proxy_password"],
                 created_at=row["created_at"],
                 updated_at=row["updated_at"],
             )
@@ -101,12 +126,11 @@ class AccountRepository(BaseRepository):
         """Set cooldown for an account."""
         query = """
             UPDATE telegram_accounts 
-            SET cooldown_until = %s, 
-                last_comment_at = NOW(),
+            SET last_comment_time = NOW(),
                 updated_at = NOW()
             WHERE id = %s
         """
-        self._db.execute(query, (cooldown_until, account_id))
+        self._db.execute(query, (account_id,))
         self._logger.info(f"Set cooldown for account {account_id} until {cooldown_until}")
 
     def update_session_status(self, account_id: int, status: str) -> None:

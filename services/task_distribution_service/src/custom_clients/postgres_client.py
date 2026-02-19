@@ -52,7 +52,7 @@ class PostgresClient:
             raise RuntimeError("Not connected to database")
         
         query = """
-            SELECT id, api_id, api_hash, phone_number,
+            SELECT id, phone_number,
                    proxy_type, proxy_host, proxy_port, proxy_username, proxy_password,
                    health_score, session_status, comments_count,
                    COALESCE(last_comment_time::text, 'never') as last_activity
@@ -76,7 +76,7 @@ class PostgresClient:
             raise RuntimeError("Not connected to database")
         
         query = """
-            SELECT id, api_id, api_hash, phone_number,
+            SELECT id, phone_number,
                    proxy_type, proxy_host, proxy_port, proxy_username, proxy_password,
                    health_score, session_status, comments_count,
                    COALESCE(last_comment_time::text, 'never') as last_activity

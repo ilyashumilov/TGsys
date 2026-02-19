@@ -52,7 +52,7 @@ class PostgresClient:
             raise RuntimeError("Not connected to database")
         
         query = """
-            SELECT id, api_id, api_hash, phone_number,
+            SELECT id, account_name, user_id, first_name, last_name, username, phone_number, session_file,
                    proxy_type, proxy_host, proxy_port, proxy_username, proxy_password,
                    health_score, session_status
             FROM telegram_accounts
@@ -70,7 +70,7 @@ class PostgresClient:
             raise RuntimeError("Not connected to database")
         
         query = """
-            SELECT id, api_id, api_hash, phone_number,
+            SELECT id, account_name, user_id, first_name, last_name, username, phone_number, session_file,
                    proxy_type, proxy_host, proxy_port, proxy_username, proxy_password,
                    health_score, session_status, is_active
             FROM telegram_accounts
@@ -88,18 +88,22 @@ class PostgresClient:
         
         query = """
             INSERT INTO telegram_accounts 
-            (api_id, api_hash, phone_number, proxy_type, proxy_host, proxy_port, 
-             proxy_username, proxy_password, session_status)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            (account_name, user_id, first_name, last_name, username, phone_number, session_file,
+             proxy_type, proxy_host, proxy_port, proxy_username, proxy_password, session_status)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
             RETURNING id
         """
         
         async with self._pool.acquire() as conn:
             result = await conn.fetchrow(
                 query,
-                account_data['api_id'],
-                account_data['api_hash'],
+                account_data['account_name'],
+                account_data.get('user_id'),
+                account_data.get('first_name'),
+                account_data.get('last_name'),
+                account_data.get('username'),
                 account_data.get('phone_number'),
+                account_data.get('session_file'),
                 account_data.get('proxy_type'),
                 account_data.get('proxy_host'),
                 account_data.get('proxy_port'),

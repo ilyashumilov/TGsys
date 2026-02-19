@@ -56,7 +56,7 @@ class WorkerOrchestrator:
             )
             
             # Initialize Docker manager
-            self._docker_manager = DockerManager(base_url=self._docker_config.base_url)
+            self._docker_manager = DockerManager()
             
             # Deploy workers for all active accounts
             await self.sync_workers_with_database()
@@ -167,7 +167,7 @@ class WorkerOrchestrator:
             if not account:
                 raise ValueError(f"Failed to retrieve inserted account {account_id}")
             
-            # Deploy worker
+            # Deploy worker (assumes session file already exists)
             await self._deploy_worker_for_account(account)
             
             self._logger.info(f"✅ Added account {account_id} and deployed worker")

@@ -1,0 +1,13 @@
+FROM python:3.11-slim
+
+# Install dependencies
+RUN pip install asyncpg
+
+# Copy the import script
+COPY import-tdata-accounts.py /app/import-tdata-accounts.py
+
+# Create working directory
+WORKDIR /app
+
+# Run the import script
+CMD ["python", "import-tdata-accounts.py"]

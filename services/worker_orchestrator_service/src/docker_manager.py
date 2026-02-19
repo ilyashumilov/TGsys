@@ -7,8 +7,8 @@ from docker.models.containers import Container
 
 
 class DockerManager:
-    def __init__(self, base_url: str = "unix:///var/run/docker.sock"):
-        self.client = docker.DockerClient(base_url=base_url)
+    def __init__(self):
+        self.client = docker.from_env()
         self._logger = logging.getLogger(__name__)
         self.worker_containers: Dict[int, Container] = {}
 
