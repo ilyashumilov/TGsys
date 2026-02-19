@@ -206,7 +206,7 @@ async def main():
         print("   This should be your actual Telegram API hash for the channel parser")
     
     # Path to proxies.csv
-    proxies_csv = "/Users/admin/Downloads/proxies.csv"
+    proxies_csv = "data/proxies.csv"
     
     if not Path(proxies_csv).exists():
         print(f"❌ Proxies file not found: {proxies_csv}")
