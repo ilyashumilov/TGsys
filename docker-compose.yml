@@ -207,6 +207,8 @@ services:
         condition: service_healthy
     volumes:
       - ./sessions:/app/sessions
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       POSTGRES_HOST: "postgres"
       DOCKER_HOST: "tcp://host.docker.internal:2375"
