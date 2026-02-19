@@ -3,15 +3,9 @@ from __future__ import annotations
 import os
 import logging
 from typing import Optional
-
 from telethon import TelegramClient
-from telethon.errors import (
-    FloodWaitError,
-    ChatWriteForbiddenError,
-    UserDeactivatedBanError,
-    UserDeactivatedError,
-    PhoneNumberBannedError,
-)
+from telethon.tl.functions.channels import JoinChannelRequest
+from telethon.errors import AlreadyInChannelError, FloodWaitError, ChatWriteForbiddenError, UserDeactivatedBanError, UserDeactivatedError, PhoneNumberBannedError
 
 
 class TelegramCommentClient:
@@ -80,8 +74,26 @@ class TelegramCommentClient:
             raise RuntimeError("Client not connected")
         
         try:
+            # Handle both usernames and chat_ids
+            if channel_username.isdigit():
+                # Private channel: use chat_id
+                chat = await self._client.get_entity(int(channel_username))
+            else:
+                # Public channel: use username
+                chat = channel_username
+            
+            # Join public channels if not already joined
+            if hasattr(chat, 'username') and chat.username:
+                try:
+                    await self._client(JoinChannelRequest(chat))
+                    self._logger.info(f"Joined channel {channel_username}")
+                except AlreadyInChannelError:
+                    pass  # Already joined
+                except Exception as e:
+                    self._logger.warning(f"Failed to join channel {channel_username}: {e}")
+            
             # Get the message to comment to
-            message = await self._client.get_messages(channel_username, ids=message_id)
+            message = await self._client.get_messages(chat, ids=message_id)
             if not message:
                 self._logger.error(f"Message {message_id} not found in {channel_username}")
                 return False
