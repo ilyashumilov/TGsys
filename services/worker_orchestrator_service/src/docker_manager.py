@@ -35,11 +35,6 @@ class DockerManager:
                 "KAFKA_BROKER": "kafka:9092",
                 "KAFKA_TOPIC": "comment-tasks",
                 "KAFKA_CONSUMER_GROUP": f"worker-{account_id}",
-                "POSTGRES_HOST": "postgres",
-                "POSTGRES_PORT": "5432",
-                "POSTGRES_DB": "tgsys",
-                "POSTGRES_USER": "postgres",
-                "POSTGRES_PASSWORD": "password",
             }
             
             # Add proxy configuration if available

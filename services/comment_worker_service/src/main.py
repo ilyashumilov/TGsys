@@ -7,9 +7,8 @@ import sys
 import time
 from typing import Dict, Any
 
-from config import AppConfig, KafkaConfig, PostgresConfig, TelegramConfig, setup_logging
-from custom_clients.kafka_client import KafkaConfig as KafkaClientConfig, KafkaConsumerClient
-from custom_clients.postgres_client import PostgresClient, PostgresConnection
+from config import AppConfig, KafkaConfig, TelegramConfig, setup_logging
+from custom_clients.kafka_client import KafkaConsumerClient, KafkaClientConfig
 from comment_generator import CommentGenerator
 from telegram_client import TelegramCommentClient
 
@@ -21,17 +20,14 @@ class CommentWorkerService:
         self,
         app_config: AppConfig,
         kafka_config: KafkaConfig,
-        postgres_config: PostgresConfig,
         telegram_config: TelegramConfig,
     ):
         self._app_config = app_config
         self._kafka_config = kafka_config
-        self._postgres_config = postgres_config
         self._telegram_config = telegram_config
         self._logger = logging.getLogger(__name__)
         
         # Initialize components
-        self._db: PostgresClient | None = None
         self._consumer: KafkaConsumerClient | None = None
         self._telegram_client: TelegramCommentClient | None = None
         self._comment_generator: CommentGenerator | None = None
@@ -46,16 +42,6 @@ class CommentWorkerService:
             # Wait for services to be ready
             self._logger.info(f"Waiting {self._kafka_config.consumer_start_delay}s for services...")
             await asyncio.sleep(self._kafka_config.consumer_start_delay)
-            
-            # Initialize database connection
-            self._db = PostgresClient(PostgresConnection(
-                host=self._postgres_config.host,
-                port=self._postgres_config.port,
-                database=self._postgres_config.db,
-                user=self._postgres_config.user,
-                password=self._postgres_config.password,
-            ))
-            await self._db.connect()
             
             # Initialize Kafka consumer
             self._consumer = KafkaConsumerClient(
@@ -106,14 +92,11 @@ class CommentWorkerService:
         if self._telegram_client:
             await self._telegram_client.disconnect()
         
-        if self._db:
-            await self._db.close()
-        
         self._logger.info("Comment Worker Service stopped")
 
     async def _process_tasks(self) -> None:
         """Process assigned comment tasks."""
-        if not all([self._consumer, self._telegram_client, self._db, self._comment_generator]):
+        if not all([self._consumer, self._telegram_client, self._comment_generator]):
             raise RuntimeError("Service not properly initialized")
         
         self._logger.info("Starting task processing...")
@@ -155,9 +138,6 @@ class CommentWorkerService:
             )
             
             if success:
-                # Update account stats
-                await self._db.update_account_stats(self._app_config.account_id)
-                
                 self._logger.info(
                     f"✅ Task {task_id} completed successfully"
                 )
@@ -165,23 +145,12 @@ class CommentWorkerService:
                 # Commit message
                 await self._consumer.commit_message(message)
             else:
-                # Update health score for failed task
-                await self._db.update_account_health(
-                    self._app_config.account_id, 
-                    -5
-                )
-                
                 self._logger.error(
                     f"❌ Task {task_id} failed - not committing for retry"
                 )
                 
         except Exception as e:
             self._logger.error(f"Error handling task {task_id}: {e}")
-            # Update health score
-            await self._db.update_account_health(
-                self._app_config.account_id, 
-                -5
-            )
             raise
 
 
@@ -205,7 +174,6 @@ async def main() -> None:
         # Load configuration
         app_config = AppConfig.from_env()
         kafka_config = KafkaConfig.from_env()
-        postgres_config = PostgresConfig.from_env()
         telegram_config = TelegramConfig.from_env()
         
         # Validate required configuration
@@ -214,7 +182,7 @@ async def main() -> None:
         
         # Initialize and start service
         service = CommentWorkerService(
-            app_config, kafka_config, postgres_config, telegram_config
+            app_config, kafka_config, telegram_config
         )
         await service.start()
         

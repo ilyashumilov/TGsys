@@ -5,25 +5,6 @@ from dataclasses import dataclass
 
 
 @dataclass
-class PostgresConfig:
-    host: str
-    port: int
-    db: str
-    user: str
-    password: str
-
-    @classmethod
-    def from_env(cls) -> PostgresConfig:
-        return cls(
-            host=os.getenv("POSTGRES_HOST", "localhost"),
-            port=int(os.getenv("POSTGRES_PORT", "5432")),
-            db=os.getenv("POSTGRES_DB", "tgsys"),
-            user=os.getenv("POSTGRES_USER", "postgres"),
-            password=os.getenv("POSTGRES_PASSWORD", "password"),
-        )
-
-
-@dataclass
 class KafkaConfig:
     broker: str
     topic: str
