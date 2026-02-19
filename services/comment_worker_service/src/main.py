@@ -81,8 +81,6 @@ class CommentWorkerService:
                 }
             
             self._telegram_client = TelegramCommentClient(
-                api_id=self._telegram_config.api_id,
-                api_hash=self._telegram_config.api_hash,
                 session_file=self._telegram_config.session_file,
                 proxy_config=proxy_config
             )
@@ -221,9 +219,6 @@ async def main() -> None:
         telegram_config = TelegramConfig.from_env()
         
         # Validate required configuration
-        if not telegram_config.api_id or not telegram_config.api_hash:
-            raise ValueError("API_ID and API_HASH are required")
-        
         if not telegram_config.session_file:
             raise ValueError("SESSION_FILE is required")
         

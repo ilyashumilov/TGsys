@@ -20,12 +20,11 @@ class SessionManager:
 
     async def create_session_for_account(
         self, 
-        api_id: int, 
-        api_hash: str, 
+        account_name: str,
         phone_number: Optional[str] = None
     ) -> str:
         """Create session file for new account using template."""
-        session_path = self.sessions_dir / f"{api_id}_session.session"
+        session_path = self.sessions_dir / f"{account_name}_session.session"
         
         if session_path.exists():
             self._logger.info(f"Session file already exists: {session_path}")
@@ -36,71 +35,14 @@ class SessionManager:
             try:
                 shutil.copy2(self.template_session_path, session_path)
                 self._logger.info(f"Copied template session to: {session_path}")
-                
-                # Customize session for this account if phone is provided
-                if phone_number:
-                    await self._customize_session(session_path, api_id, api_hash, phone_number)
-                
+                self._logger.warning(f"Session file copied for account {account_name}. Ensure it is authorized for this account.")
                 return str(session_path)
             except Exception as e:
                 self._logger.error(f"Failed to copy template session: {e}")
                 raise
         else:
-            # Create new session from scratch
-            await self._create_new_session(session_path, api_id, api_hash, phone_number)
-            return str(session_path)
-
-    async def _customize_session(
-        self, 
-        session_path: Path, 
-        api_id: int, 
-        api_hash: str, 
-        phone_number: str
-    ) -> None:
-        """Customize existing session with account credentials."""
-        try:
-            client = TelegramClient(str(session_path), api_id, api_hash)
-            await client.connect()
-            
-            if not await client.is_user_authorized():
-                await client.send_code_request(phone_number)
-                code = input(f"Enter code for {phone_number}: ")
-                await client.sign_in(phone_number, code)
-            
-            await client.disconnect()
-            self._logger.info(f"Customized session for account {api_id}")
-        except Exception as e:
-            self._logger.error(f"Failed to customize session: {e}")
-            # Remove corrupted session
-            if session_path.exists():
-                session_path.unlink()
-            raise
-
-    async def _create_new_session(
-        self, 
-        session_path: Path, 
-        api_id: int, 
-        api_hash: str, 
-        phone_number: Optional[str] = None
-    ) -> None:
-        """Create brand new session file."""
-        try:
-            client = TelegramClient(str(session_path), api_id, api_hash)
-            await client.connect()
-            
-            if phone_number:
-                await client.send_code_request(phone_number)
-                code = input(f"Enter code for {phone_number}: ")
-                await client.sign_in(phone_number, code)
-            
-            await client.disconnect()
-            self._logger.info(f"Created new session for account {api_id}")
-        except Exception as e:
-            self._logger.error(f"Failed to create session: {e}")
-            # Remove corrupted session
-            if session_path.exists():
-                session_path.unlink()
-            raise
+            self._logger.error(f"Template session file not found: {self.template_session_path}")
+            raise FileNotFoundError(f"Template session file not found: {self.template_session_path}")
 
     def validate_session_file(self, session_path: str) -> bool:
         """Validate session file integrity."""

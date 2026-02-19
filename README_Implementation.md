@@ -37,9 +37,13 @@ This document provides a complete implementation of the TGsys Telegram automatio
 -- Simplified telegram_accounts table
 CREATE TABLE telegram_accounts (
   id BIGSERIAL PRIMARY KEY,
-  api_id BIGINT NOT NULL UNIQUE,
-  api_hash TEXT NOT NULL,
+  account_name TEXT NOT NULL,
+  user_id BIGINT,
+  first_name TEXT,
+  last_name TEXT,
+  username TEXT,
   phone_number TEXT,
+  session_file TEXT NOT NULL,
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
   last_comment_time TIMESTAMPTZ,
   comments_count INTEGER NOT NULL DEFAULT 0,
@@ -96,12 +100,12 @@ The Worker Orchestrator will automatically deploy workers for accounts in the da
 ```sql
 -- Add first account
 INSERT INTO telegram_accounts (
-  api_id, api_hash, phone_number,
+  account_name, phone_number,
   proxy_type, proxy_host, proxy_port,
   proxy_username, proxy_password,
   session_status
 ) VALUES (
-  12345678, 'your_api_hash', '+1234567890',
+  'account1', '+1234567890',
   'socks5', 'proxy.example.com', 1080,
   'proxy_user', 'proxy_pass',
   'authorized'
@@ -157,9 +161,7 @@ MAX_RETRIES: 3
 **Environment Variables**:
 ```bash
 ACCOUNT_ID=1
-API_ID=12345678
-API_HASH=your_api_hash
-SESSION_FILE=/app/sessions/12345678_session.session
+SESSION_FILE=/app/sessions/account1_session.session
 PROXY_TYPE=socks5
 PROXY_HOST=proxy.example.com
 PROXY_PORT=1080
@@ -208,11 +210,11 @@ Worker Orchestrator monitors:
 
 ```sql
 INSERT INTO telegram_accounts (
-  api_id, api_hash, phone_number,
+  account_name, phone_number,
   proxy_type, proxy_host, proxy_port,
   session_status
 ) VALUES (
-  87654321, 'another_api_hash', '+0987654321',
+  'account2', '+0987654321',
   'socks5', 'proxy2.example.com', 1080,
   'unknown'
 );

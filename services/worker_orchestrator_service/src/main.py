@@ -125,12 +125,10 @@ class WorkerOrchestrator:
             raise RuntimeError("Service not properly initialized")
         
         account_id = account['id']
-        api_id = account['api_id']
         
         # Create session file if needed
         session_path = await self._session_manager.create_session_for_account(
-            api_id=api_id,
-            api_hash=account['api_hash'],
+            account_name=account['account_name'],
             phone_number=account.get('phone_number')
         )
         

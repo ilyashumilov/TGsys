@@ -29,7 +29,7 @@ cloud "Telegram API" as telegram {
 ' Database Layer
 database "PostgreSQL" as postgres {
   [telegram_channels\n(id, identifier, tg_channel_id,\n last_message_id, is_active)]
-  [telegram_accounts\n(id, api_id, api_hash, proxy_type,\n proxy_host, proxy_port, session_status,\n last_comment_time, comments_count, health_score,\n is_active)]
+  [telegram_accounts\n(id, account_name, user_id, first_name,\n last_name, username, phone_number, session_file,\n proxy_type, proxy_host, proxy_port, session_status,\n last_comment_time, comments_count, health_score,\n is_active)]
 }
 
 ' Message Queue
@@ -51,9 +51,8 @@ rectangle "Services" as services {
   [kafka_logger\n\n• Logs all events\n• Monitoring] as logger
 }
 
-' Session Storage
 database "File System" as filesystem {
-  [sessions/\n{api_id}_session.session\n\n• Account session files\n• Proxy-bound connections] as sessions
+  [sessions/\n{account_name}_session.session\n\n• Account session files\n• Proxy-bound connections] as sessions
 }
 
 ' Data Flow
@@ -65,7 +64,7 @@ kafka --> logger : "4. Log events"
 task_distributor --> postgres : "5. Get available accounts\n(1-hour cooldown check)"
 task_distributor --> kafka : "6. Publish CommentTask\n(account_id, channel_id, message_id)"
 kafka --> comment_workers : "7. Account-specific consumption"
-comment_workers --> filesystem : "8. Read session file\n{api_id}_session.session"
+comment_workers --> filesystem : "8. Read session file\n{account_name}_session.session"
 comment_workers --> telegram : "9. Post comment\nvia proxy"
 comment_workers --> postgres : "10. Update account\n(last_comment_time, comments_count)"
 

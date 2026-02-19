@@ -107,8 +107,6 @@ def create_kafka_validator() -> ConfigValidator:
 def create_telegram_validator() -> ConfigValidator:
     """Create Telegram API configuration validator."""
     return ConfigValidator().add_rule(
-        ValidationRule("TELEGRAM_API_ID", required=True, type_hint=int, min_value=1)
-    ).add_rule(ValidationRule("TELEGRAM_API_HASH", required=True)).add_rule(
         ValidationRule("SESSIONS_DIR", default_value="/sessions")
     )
 

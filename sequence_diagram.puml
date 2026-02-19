@@ -25,7 +25,7 @@ note over Orchestrator: One container per account\nwith unique session file
 
 loop For Each Account
     Orchestrator -> Worker: Start Container
-    Worker -> Sessions: Load {api_id}_session.session
+    Worker -> Sessions: Load {account_name}_session.session
     Sessions --> Worker: Session Data + Proxy Info
     Worker -> Kafka: Connect Consumer (account-specific)
 end

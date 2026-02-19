@@ -42,7 +42,6 @@ def main() -> None:
         logger.info(f"Configuration loaded - Tick interval: {app_config.tick_seconds}s")
         logger.info(f"PostgreSQL: {pg_config.host}:{pg_config.port}/{pg_config.db}")
         logger.info(f"Kafka: {kafka_config.broker} - Topic: {kafka_config.topic}")
-        logger.info(f"Telegram API ID: {tg_config.api_id}")
         logger.info(f"Telegram Session Path: {tg_config.session_path}")
         
         # Initialize database connection

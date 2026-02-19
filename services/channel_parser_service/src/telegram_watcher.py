@@ -161,7 +161,7 @@ class TelegramChannelWatcher:
         session_name = self._session.prepare_writable_session_name()
         self._logger.info("Starting Telegram client...")
 
-        with TelegramClient(session_name, self._tg_config.api_id, self._tg_config.api_hash) as client:
+        with TelegramClient(session_name) as client:
             if not client.is_user_authorized():
                 raise RuntimeError(
                     "Telegram client is not authorized. Provide a valid authorized session file."

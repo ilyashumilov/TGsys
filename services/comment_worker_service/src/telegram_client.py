@@ -16,10 +16,7 @@ from telethon.errors import (
 class TelegramCommentClient:
     """Telegram client for posting comments."""
 
-    def __init__(self, api_id: int, api_hash: str, session_file: str, 
-                 proxy_config: dict = None):
-        self.api_id = api_id
-        self.api_hash = api_hash
+    def __init__(self, session_file: str, proxy_config: dict = None):
         self.session_file = session_file
         self.proxy_config = proxy_config
         self._logger = logging.getLogger(__name__)
@@ -53,8 +50,6 @@ class TelegramCommentClient:
             # Create client
             self._client = TelegramClient(
                 self.session_file,
-                self.api_id,
-                self.api_hash,
                 proxy=proxy
             )
             
@@ -65,7 +60,7 @@ class TelegramCommentClient:
                 self._logger.error("Session is not authorized")
                 return False
             
-            self._logger.info(f"Connected to Telegram (account {self.api_id})")
+            self._logger.info("Connected to Telegram successfully")
             return True
             
         except Exception as e:

@@ -355,7 +355,7 @@ provide_instructions() {
     echo ""
     echo "3. Configure environment file:"
     echo "   nano .env.lightweight"
-    echo "   # Add your TELEGRAM_API_ID and TELEGRAM_API_HASH"
+    echo "   # Configure database and other settings"
     echo ""
     echo "4. Deploy TGsys:"
     echo "   ./deploy.sh deploy"

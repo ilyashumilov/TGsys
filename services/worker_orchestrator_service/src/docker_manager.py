@@ -28,9 +28,7 @@ class DockerManager:
         try:
             environment = {
                 "ACCOUNT_ID": str(account_id),
-                "API_ID": str(account_data['api_id']),
-                "API_HASH": account_data['api_hash'],
-                "SESSION_FILE": f"/app/sessions/{account_data['api_id']}_session.session",
+                "SESSION_FILE": f"/app/sessions/{account_data['account_name']}_session.session",
                 "KAFKA_BROKER": "kafka:9092",
                 "KAFKA_TOPIC": "comment-tasks",
                 "KAFKA_CONSUMER_GROUP": f"worker-{account_id}",
