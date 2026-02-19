@@ -144,18 +144,18 @@ class AccountRepository(BaseRepository):
         self._db.execute(query, (status, account_id))
         self._logger.info(f"Updated session status for account {account_id} to {status}")
 
-    def add_account(self, api_id: int, api_hash: str, phone_number: Optional[str] = None) -> int:
+    def add_account(self, account_name: str, api_hash: str, phone_number: Optional[str] = None) -> int:
         """Add a new Telegram account."""
         query = """
-            INSERT INTO telegram_accounts (api_id, api_hash, phone_number)
+            INSERT INTO telegram_accounts (account_name, api_hash, phone_number)
             VALUES (%s, %s, %s)
-            ON CONFLICT (api_id) DO UPDATE SET
+            ON CONFLICT (account_name) DO UPDATE SET
                 api_hash = EXCLUDED.api_hash,
                 phone_number = EXCLUDED.phone_number,
                 updated_at = NOW()
             RETURNING id
         """
-        result = self._db.fetch_one(query, (api_id, api_hash, phone_number))
+        result = self._db.fetch_one(query, (account_name, api_hash, phone_number))
         account_id = result["id"]
-        self._logger.info(f"Added/updated account with API ID {api_id}, ID: {account_id}")
+        self._logger.info(f"Added/updated account with account_name {account_name}, ID: {account_id}")
         return account_id

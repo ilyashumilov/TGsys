@@ -103,12 +103,6 @@ class WorkerOrchestrator:
             accounts = await self._db.get_active_accounts()
             self._logger.info(f"Found {len(accounts)} active accounts")
             
-            # Cleanup orphaned sessions
-            active_account_ids = [account['id'] for account in accounts]
-            orphaned = self._session_manager.cleanup_orphaned_sessions(active_account_ids)
-            if orphaned:
-                self._logger.info(f"Cleaned up {len(orphaned)} orphaned session files")
-            
             # Deploy workers for each account
             for account in accounts:
                 try:

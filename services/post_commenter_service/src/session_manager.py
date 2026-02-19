@@ -80,21 +80,22 @@ class SessionManager:
         session_files = self.discover_session_files()
         db_accounts = account_repo.get_all_accounts()
         
-        # Create a map of API ID to account for easy lookup
-        account_map = {account.api_id: account for account in db_accounts}
+        # Create a map of account name to account for easy lookup
+        account_map = {account.account_name: account for account in db_accounts}
         
         # Add new accounts from session files
         for api_id, session_path in session_files.items():
-            if api_id not in account_map:
+            account_name = str(api_id)
+            if account_name not in account_map:
                 # New account found, add to database
                 if self.validate_session_file(session_path):
-                    account_repo.add_account(api_id, "unknown")  # api_hash will be updated separately
-                    self._logger.info(f"Added new account to database: API ID {api_id}")
+                    account_repo.add_account(account_name)  # account_name will be updated separately
+                    self._logger.info(f"Added new account to database: account_name {account_name}")
                 else:
-                    self._logger.error(f"Skipping invalid session for API ID {api_id}")
+                    self._logger.error(f"Skipping invalid session for account_name {account_name}")
             else:
                 # Update session status based on file existence
-                account = account_map[api_id]
+                account = account_map[account_name]
                 if self.validate_session_file(session_path):
                     if account.session_status != "authorized":
                         account_repo.update_session_status(account.id, "authorized")

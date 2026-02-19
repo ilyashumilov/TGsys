@@ -114,23 +114,3 @@ class SessionManager:
     def get_session_files(self) -> list[str]:
         """Get all session files."""
         return [str(f) for f in self.sessions_dir.glob("*_session.session")]
-
-    def cleanup_orphaned_sessions(self, active_account_ids: list[int]) -> list[str]:
-        """Remove session files for accounts not in database."""
-        all_sessions = self.get_session_files()
-        orphaned = []
-        
-        for session_file in all_sessions:
-            try:
-                api_id = int(Path(session_file).stem.split('_')[0])
-                if api_id not in active_account_ids:
-                    Path(session_file).unlink()
-                    orphaned.append(session_file)
-                    self._logger.info(f"Removed orphaned session: {session_file}")
-            except (ValueError, IndexError):
-                # Invalid session filename, remove it
-                Path(session_file).unlink()
-                orphaned.append(session_file)
-                self._logger.warning(f"Removed invalid session file: {session_file}")
-        
-        return orphaned

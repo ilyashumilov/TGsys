@@ -161,43 +161,6 @@ services:
         reservations:
           memory: 128M
 
-  post_commenter_service:
-    build: ./services/post_commenter_service
-    container_name: post_commenter_service
-    env_file: .env
-    depends_on:
-      postgres:
-        condition: service_healthy
-      kafka:
-        condition: service_healthy
-    environment:
-      KAFKA_BROKER: "kafka:${KAFKA_PORT:-9092}"
-      KAFKA_TOPIC: "comment-tasks"
-      KAFKA_CONSUMER_GROUP: "post-commenter-group"
-      KAFKA_CONSUMER_START_DELAY: "30"
-      POSTGRES_HOST: "postgres"
-      SESSIONS_DIR: "/app/sessions"
-      MIN_COOLDOWN_MINUTES: "10"
-      MAX_COOLDOWN_MINUTES: "30"
-      MAX_WORKERS: "10"
-      WORKER_TIMEOUT: "300"
-      LOG_LEVEL: "INFO"
-    volumes:
-      - ./sessions:/app/sessions
-    command: sh -c "sleep 35 && python src/main.py"
-    healthcheck:
-      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-        reservations:
-          memory: 256M
-
   worker_orchestrator_service:
     build: ./services/worker_orchestrator_service
     container_name: worker_orchestrator_service
