@@ -10,8 +10,8 @@ docker-compose build
 
 # Поднимаем систему в фоне
 echo "Запускаем систему в фоне..."
-# docker-compose up -d
-docker-compose up
+docker-compose up -d
+# docker-compose up
 
 echo "Система успешно перезапущена!"
-# docker ps
+docker ps
