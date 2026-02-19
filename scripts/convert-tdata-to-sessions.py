@@ -16,7 +16,7 @@ import json
 try:
     from opentele.td import TDesktop
     from opentele.tl import TelegramClient
-    from opentele.api import API, UseCurrentSession
+    from opentele.api import API, UseCurrentSession, APIData
 except ImportError:
     print("❌ OpenTele not installed. Please install it with: pip install opentele")
     sys.exit(1)
@@ -24,10 +24,12 @@ except ImportError:
 class TDataConverter:
     """Convert tdata directories to Telethon session files using OpenTele."""
     
-    def __init__(self, base_dir: str = "/Users/admin/Desktop/TGsys/sessions"):
+    def __init__(self, base_dir: str = "/Users/admin/Desktop/TGsys/sessions", api_id: int = 10840, api_hash: str = "8e2e4c60c6ba4c7f7b9d4e4e6f0c0a2a"):
         self.base_dir = Path(base_dir)
         self.tdata_dir = self.base_dir / "tdata"
         self.sessions_dir = self.base_dir
+        self.api_id = api_id
+        self.api_hash = api_hash
         
     def find_tdata_directories(self) -> List[Path]:
         """Find all directories containing tdata folders."""
@@ -77,10 +79,14 @@ class TDataConverter:
             
             print(f"✅ TDesktop loaded for {account_name}")
             
+            # Create custom API data
+            api = APIData(id=self.api_id, hash=self.api_hash)
+            
             # Convert TDesktop to Telethon using the current session
             client = await tdesk.ToTelethon(
                 session=str(session_file.with_suffix('')),
-                flag=UseCurrentSession
+                flag=UseCurrentSession,
+                api=api
             )
             
             # Connect and verify the session
@@ -151,10 +157,14 @@ async def main():
     parser = argparse.ArgumentParser(description="Convert tdata directories to Telethon session files using OpenTele")
     parser.add_argument("--base-dir", type=str, default="/Users/admin/Desktop/TGsys/sessions", 
                        help="Base directory containing tdata folder")
+    parser.add_argument("--api-id", type=int, default=10840,
+                       help="Telegram API ID to use for session conversion (default: 10840 for workers)")
+    parser.add_argument("--api-hash", type=str, default="8e2e4c60c6ba4c7f7b9d4e4e6f0c0a2a",
+                       help="Telegram API hash to use for session conversion")
     
     args = parser.parse_args()
     
-    converter = TDataConverter(args.base_dir)
+    converter = TDataConverter(args.base_dir, args.api_id, args.api_hash)
     await converter.convert_all_accounts()
 
 if __name__ == "__main__":
