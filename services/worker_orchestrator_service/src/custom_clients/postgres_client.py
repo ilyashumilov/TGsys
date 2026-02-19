@@ -52,7 +52,7 @@ class PostgresClient:
             raise RuntimeError("Not connected to database")
         
         query = """
-            SELECT id, account_name, user_id, first_name, last_name, username, phone_number, session_file,
+            SELECT id, api_id, api_hash, account_name, user_id, first_name, last_name, username, phone_number, session_file,
                    proxy_type, proxy_host, proxy_port, proxy_username, proxy_password,
                    health_score, session_status
             FROM telegram_accounts
@@ -70,7 +70,7 @@ class PostgresClient:
             raise RuntimeError("Not connected to database")
         
         query = """
-            SELECT id, account_name, user_id, first_name, last_name, username, phone_number, session_file,
+            SELECT id, api_id, api_hash, account_name, user_id, first_name, last_name, username, phone_number, session_file,
                    proxy_type, proxy_host, proxy_port, proxy_username, proxy_password,
                    health_score, session_status, is_active
             FROM telegram_accounts
