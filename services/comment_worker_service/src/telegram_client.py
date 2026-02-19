@@ -5,7 +5,7 @@ import logging
 from typing import Optional
 from telethon import TelegramClient
 from telethon.tl.functions.channels import JoinChannelRequest
-from telethon.errors import AlreadyInChannelError, FloodWaitError, ChatWriteForbiddenError, UserDeactivatedBanError, UserDeactivatedError, PhoneNumberBannedError
+from telethon.errors import FloodWaitError, ChatWriteForbiddenError, UserDeactivatedBanError, UserDeactivatedError, PhoneNumberBannedError
 
 
 class TelegramCommentClient:
