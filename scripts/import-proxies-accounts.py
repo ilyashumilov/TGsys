@@ -91,14 +91,13 @@ async def import_proxy_accounts(conn, proxies_csv_path):
                 country = row.get('country', 'unknown')
                 
                 # Generate account details based on proxy
-                api_id = int(proxy_id) + 100000000  # Ensure unique API IDs
-                api_hash = f"generated_hash_{proxy_id}"  # Replace with actual API hashes
+                account_name = f"account_{proxy_id}"
                 phone_number = f"+1{proxy_id:010d}"  # Generate phone number
                 
                 # Check if account already exists
                 existing = await conn.fetchval(
-                    "SELECT id FROM telegram_accounts WHERE api_id = $1",
-                    api_id
+                    "SELECT id FROM telegram_accounts WHERE account_name = $1",
+                    account_name
                 )
                 
                 if existing:
@@ -114,28 +113,28 @@ async def import_proxy_accounts(conn, proxies_csv_path):
                             is_active = true,
                             health_score = 85,
                             session_status = 'authorized'
-                        WHERE api_id = $1
+                        WHERE account_name = $1
                         """,
-                        api_id, proxy_ip, int(port_socks5), username, password
+                        account_name, proxy_ip, int(port_socks5), username, password
                     )
                     updated_count += 1
-                    print(f"🔄 Updated account {api_id} with proxy {proxy_ip}:{port_socks5}")
+                    print(f"🔄 Updated account {account_name} with proxy {proxy_ip}:{port_socks5}")
                 else:
                     # Insert new account
                     await conn.execute(
                         """
                         INSERT INTO telegram_accounts 
-                        (api_id, api_hash, phone_number, is_active,
+                        (account_name, phone_number, is_active,
                          health_score, session_status, comments_count,
                          proxy_type, proxy_host, proxy_port, proxy_username, proxy_password)
-                        VALUES ($1, $2, $3, true, 85, 'authorized', 0,
-                                'socks5', $4, $5, $6, $7)
+                        VALUES ($1, $2, true, 85, 'authorized', 0,
+                                'socks5', $3, $4, $5, $6)
                         """,
-                        api_id, api_hash, phone_number,
+                        account_name, phone_number,
                         proxy_ip, int(port_socks5), username, password
                     )
                     imported_count += 1
-                    print(f"✅ Imported account {api_id} with proxy {proxy_ip}:{port_socks5} ({country})")
+                    print(f"✅ Imported account {account_name} with proxy {proxy_ip}:{port_socks5} ({country})")
                 
             except Exception as e:
                 print(f"❌ Error processing proxy {proxy_id}: {e}")
@@ -151,9 +150,9 @@ async def import_proxy_accounts(conn, proxies_csv_path):
 async def create_session_template(conn):
     """Create session template file path info."""
     print("\n📄 Session file setup:")
-    print("   ├─ Channel parser: /app/sessions/33093187_session.session")
+    print("   ├─ Channel parser: /app/sessions/channel_parser_session.session")
     print("   ├─ Template file: /app/sessions/33093187_session.session")
-    print("   └─ Workers will use this template to create account-specific sessions")
+    print("   └─ Workers will copy template to account-specific sessions (e.g., account_1_session.session)")
 
 async def show_account_summary(conn):
     """Show summary of all accounts in database."""
@@ -161,14 +160,14 @@ async def show_account_summary(conn):
     
     # Channel parser account
     channel_parser = await conn.fetchrow(
-        "SELECT * FROM telegram_accounts WHERE api_id = $1",
-        CHANNEL_PARSER_API_ID
+        "SELECT * FROM telegram_accounts WHERE account_name = $1",
+        "channel_parser"
     )
     
     if channel_parser:
-        print(f"🔍 Channel Parser Account:")
+        print("🔍 Channel Parser Account:")
         print(f"   ├─ ID: {channel_parser['id']}")
-        print(f"   ├─ API ID: {channel_parser['api_id']}")
+        print(f"   ├─ Name: {channel_parser['account_name']}")
         print(f"   ├─ Status: {channel_parser['session_status']}")
         print(f"   ├─ Health: {channel_parser['health_score']}")
         print(f"   └─ Active: {channel_parser['is_active']}")
@@ -176,19 +175,19 @@ async def show_account_summary(conn):
     # Comment worker accounts
     worker_accounts = await conn.fetch(
         """
-        SELECT id, api_id, proxy_host, proxy_port, health_score, 
+        SELECT id, account_name, proxy_host, proxy_port, health_score, 
                session_status, comments_count
         FROM telegram_accounts 
-        WHERE api_id != $1 AND is_active = true
+        WHERE account_name != $1 AND is_active = true
         ORDER BY id
         """,
-        CHANNEL_PARSER_API_ID
+        "channel_parser"
     )
     
     print(f"\n👥 Comment Worker Accounts ({len(worker_accounts)} total):")
     
     for i, account in enumerate(worker_accounts[:5], 1):  # Show first 5
-        print(f"   ├─ Account {account['id']}: API {account['api_id']} "
+        print(f"   ├─ Account {account['id']}: {account['account_name']} "
               f"→ {account['proxy_host']}:{account['proxy_port']} "
               f"(Health: {account['health_score']}, Comments: {account['comments_count']})")
     
