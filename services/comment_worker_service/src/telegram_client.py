@@ -16,9 +16,10 @@ from telethon.errors import (
 class TelegramCommentClient:
     """Telegram client for posting comments."""
 
-    def __init__(self, session_file: str, proxy_config: dict = None):
+    def __init__(self, api_id: int, api_hash: str, session_file: str):
+        self._api_id = api_id
+        self._api_hash = api_hash
         self.session_file = session_file
-        self.proxy_config = proxy_config
         self._logger = logging.getLogger(__name__)
         self._client: Optional[TelegramClient] = None
 
@@ -27,29 +28,28 @@ class TelegramCommentClient:
         try:
             # Setup proxy if configured
             proxy = None
-            if self.proxy_config and self.proxy_config.get('proxy_type'):
-                if self.proxy_config['proxy_type'] == 'socks5':
+            proxy_type = os.getenv("PROXY_TYPE")
+            if proxy_type:
+                proxy_host = os.getenv("PROXY_HOST")
+                proxy_port = int(os.getenv("PROXY_PORT", "0"))
+                proxy_username = os.getenv("PROXY_USERNAME")
+                proxy_password = os.getenv("PROXY_PASSWORD")
+                
+                if proxy_type in ('socks5', 'http'):
                     proxy = (
-                        self.proxy_config['proxy_type'],
-                        self.proxy_config['proxy_host'],
-                        self.proxy_config['proxy_port'],
+                        proxy_type,
+                        proxy_host,
+                        proxy_port,
                         True,  # rdns
-                        self.proxy_config.get('proxy_username'),
-                        self.proxy_config.get('proxy_password')
-                    )
-                elif self.proxy_config['proxy_type'] == 'http':
-                    proxy = (
-                        self.proxy_config['proxy_type'],
-                        self.proxy_config['proxy_host'],
-                        self.proxy_config['proxy_port'],
-                        True,  # rdns
-                        self.proxy_config.get('proxy_username'),
-                        self.proxy_config.get('proxy_password')
+                        proxy_username,
+                        proxy_password
                     )
             
             # Create client
             self._client = TelegramClient(
                 self.session_file,
+                self._api_id,
+                self._api_hash,
                 proxy=proxy
             )
             

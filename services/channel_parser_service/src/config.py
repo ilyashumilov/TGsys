@@ -37,13 +37,17 @@ class PostgresConfig:
 
 @dataclass(frozen=True)
 class TelegramConfig:
+    api_id: int
+    api_hash: str
     session_path: str
 
     @classmethod
     def from_env(cls) -> "TelegramConfig":
+        api_id = int(os.getenv("TELEGRAM_API_ID", "0"))
+        api_hash = os.getenv("TELEGRAM_API_HASH", "dummy")
         session_path = os.getenv("TELEGRAM_SESSION_PATH", "/sessions/channel_parser_session.session")
 
-        return cls(session_path=session_path)
+        return cls(api_id=api_id, api_hash=api_hash, session_path=session_path)
 
 
 @dataclass(frozen=True)

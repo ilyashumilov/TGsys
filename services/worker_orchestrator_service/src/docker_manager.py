@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from typing import Dict, Optional, List
+import os
 import docker
 from docker.models.containers import Container
 
@@ -29,6 +30,8 @@ class DockerManager:
             environment = {
                 "ACCOUNT_ID": str(account_id),
                 "SESSION_FILE": f"/app/sessions/{account_data['account_name']}_session.session",
+                "TELEGRAM_API_ID": os.getenv("TELEGRAM_API_ID", "2040"),
+                "TELEGRAM_API_HASH": os.getenv("TELEGRAM_API_HASH", "b18441a1ff607e10a989891a5462e627"),
                 "KAFKA_BROKER": "kafka:9092",
                 "KAFKA_TOPIC": "comment-tasks",
                 "KAFKA_CONSUMER_GROUP": f"worker-{account_id}",

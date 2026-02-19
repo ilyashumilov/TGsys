@@ -69,20 +69,10 @@ class CommentWorkerService:
             )
             await self._consumer.connect()
             
-            # Initialize Telegram client
-            proxy_config = None
-            if self._telegram_config.proxy_type:
-                proxy_config = {
-                    'proxy_type': self._telegram_config.proxy_type,
-                    'proxy_host': self._telegram_config.proxy_host,
-                    'proxy_port': self._telegram_config.proxy_port,
-                    'proxy_username': self._telegram_config.proxy_username,
-                    'proxy_password': self._telegram_config.proxy_password,
-                }
-            
             self._telegram_client = TelegramCommentClient(
-                session_file=self._telegram_config.session_file,
-                proxy_config=proxy_config
+                self._telegram_config.api_id,
+                self._telegram_config.api_hash,
+                self._telegram_config.session_file
             )
             
             if not await self._telegram_client.connect():

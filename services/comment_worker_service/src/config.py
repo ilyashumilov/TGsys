@@ -42,23 +42,17 @@ class KafkaConfig:
 
 @dataclass
 class TelegramConfig:
+    api_id: int
+    api_hash: str
     session_file: str
-    proxy_type: str = None
-    proxy_host: str = None
-    proxy_port: int = None
-    proxy_username: str = None
-    proxy_password: str = None
 
     @classmethod
-    def from_env(cls) -> TelegramConfig:
-        return cls(
-            session_file=os.getenv("SESSION_FILE"),
-            proxy_type=os.getenv("PROXY_TYPE"),
-            proxy_host=os.getenv("PROXY_HOST"),
-            proxy_port=int(os.getenv("PROXY_PORT")) if os.getenv("PROXY_PORT") else None,
-            proxy_username=os.getenv("PROXY_USERNAME"),
-            proxy_password=os.getenv("PROXY_PASSWORD"),
-        )
+    def from_env(cls) -> "TelegramConfig":
+        api_id = int(os.getenv("TELEGRAM_API_ID", "0"))
+        api_hash = os.getenv("TELEGRAM_API_HASH", "dummy")
+        session_file = os.getenv("SESSION_FILE", "/app/sessions/default_session.session")
+
+        return cls(api_id=api_id, api_hash=api_hash, session_file=session_file)
 
 
 @dataclass

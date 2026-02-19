@@ -72,15 +72,18 @@ services:
     container_name: channel_parser_service
     env_file: .env
     depends_on:
-      kafka:
-        condition: service_healthy
       postgres:
+        condition: service_healthy
+      kafka:
         condition: service_healthy
       task_distribution_service:
         condition: service_healthy
       worker_orchestrator_service:
         condition: service_healthy
     environment:
+      TELEGRAM_SESSION_PATH: "/sessions/channel_parser_session.session"
+      TELEGRAM_API_ID: "${TELEGRAM_API_ID}"
+      TELEGRAM_API_HASH: "${TELEGRAM_API_HASH}"
       KAFKA_BROKER: "kafka:${KAFKA_PORT:-9092}"
       KAFKA_TOPIC: "telegram-last-post"
       POSTGRES_HOST: "postgres"
@@ -173,6 +176,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    privileged: true
     environment:
       POSTGRES_HOST: "postgres"
       DOCKER_HOST: "unix:///var/run/docker.sock"
