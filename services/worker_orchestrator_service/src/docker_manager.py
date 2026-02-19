@@ -30,8 +30,8 @@ class DockerManager:
             environment = {
                 "ACCOUNT_ID": str(account_id),
                 "SESSION_FILE": f"/app/sessions/{account_data['account_name']}_session.session",
-                "TELEGRAM_API_ID": os.getenv("TELEGRAM_API_ID", "2040"),
-                "TELEGRAM_API_HASH": os.getenv("TELEGRAM_API_HASH", "b18441a1ff607e10a989891a5462e627"),
+                "TELEGRAM_API_ID": os.getenv("WORKER_API_ID", "10840"),
+                "TELEGRAM_API_HASH": os.getenv("WORKER_API_HASH", "8e2e4c60c6ba4c7f7b9d4e4e6f0c0a2a"),
                 "KAFKA_BROKER": "kafka:9092",
                 "KAFKA_TOPIC": "comment-tasks",
                 "KAFKA_CONSUMER_GROUP": f"worker-{account_id}",
