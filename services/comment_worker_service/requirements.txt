@@ -1,7 +1,5 @@
 asyncio
-asyncpg
 aiokafka
-psycopg2-binary
 python-dotenv
 pydantic
 telethon
