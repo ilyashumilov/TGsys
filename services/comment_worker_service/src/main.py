@@ -8,7 +8,7 @@ import time
 from typing import Dict, Any
 
 from config import AppConfig, KafkaConfig, TelegramConfig, setup_logging
-from custom_clients.kafka_client import KafkaConsumerClient, KafkaClientConfig
+from custom_clients.kafka_client import KafkaConsumerClient, KafkaConsumerConfig
 from comment_generator import CommentGenerator
 from telegram_client import TelegramCommentClient
 
@@ -45,7 +45,7 @@ class CommentWorkerService:
             
             # Initialize Kafka consumer
             self._consumer = KafkaConsumerClient(
-                KafkaClientConfig(
+                KafkaConsumerConfig(
                     broker=self._kafka_config.broker,
                     topic=self._kafka_config.topic,
                     consumer_group=self._kafka_config.consumer_group,

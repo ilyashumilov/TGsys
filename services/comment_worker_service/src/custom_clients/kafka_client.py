@@ -10,7 +10,7 @@ from aiokafka.errors import KafkaError
 
 
 @dataclass
-class KafkaConfig:
+class KafkaConsumerConfig:
     broker: str
     topic: str
     consumer_group: str
@@ -18,7 +18,7 @@ class KafkaConfig:
 
 
 class KafkaConsumerClient:
-    def __init__(self, config: KafkaConfig, account_id: int):
+    def __init__(self, config: KafkaConsumerConfig, account_id: int):
         self._config = config
         self._account_id = account_id
         self._consumer: Optional[AIOKafkaConsumer] = None
