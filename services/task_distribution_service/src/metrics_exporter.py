@@ -6,7 +6,6 @@ import time
 import logging
 from typing import Dict, Any, Optional
 from prometheus_client import Counter, Gauge, Histogram, start_http_server
-from shared.metrics import get_metrics, track_business_metrics
 
 
 class TaskDistributionMetrics:

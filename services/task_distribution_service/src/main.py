@@ -132,9 +132,10 @@ class TaskDistributionService:
             task_id = f"task_{self._task_counter}"
             self._task_counter += 1
             
-            # Record task queued
+            # Record task queued but don't increment pending count yet
             if self._metrics_exporter:
                 self._metrics_exporter.record_task_queued(task_id)
+                # Keep current pending count, don't increment yet
             
             # Log new task received with full details
             self._logger.info(
@@ -149,38 +150,52 @@ class TaskDistributionService:
             
             # Check available accounts before assignment
             self._logger.info("🔍 Searching for available accounts...")
-            available_accounts = await self._db.get_available_accounts_list(
-                min_health_score=self._app_config.min_health_score,
-                cooldown_hours=self._app_config.cooldown_hours
-            )
+            available_accounts = []
+            account = None
             
-            if available_accounts:
-                self._logger.info(
-                    f"📊 Found {len(available_accounts)} available accounts:\n" +
-                    "\n".join([
-                        f"   ├─ Account {acc['id']}: Health={acc['health_score']}, "
-                        f"Comments={acc['comments_count']}, Last Activity={acc['last_activity']}"
-                        for acc in available_accounts[:3]  # Show top 3
-                    ])
+            try:
+                available_accounts = await self._db.get_available_accounts_list(
+                    min_health_score=self._app_config.min_health_score,
+                    cooldown_hours=self._app_config.cooldown_hours
                 )
-            else:
-                self._logger.warning("⚠️  No available accounts found in system")
-            
-            # Update account availability metrics
-            if self._metrics_exporter:
-                busy_accounts = max(0, len(available_accounts) - 5)  # Estimate busy accounts
-                avg_health = sum(acc['health_score'] for acc in available_accounts) / len(available_accounts) if available_accounts else 0
-                self._metrics_exporter.update_account_availability(
-                    available=len(available_accounts),
-                    busy=busy_accounts,
-                    avg_health=avg_health
+                
+                if available_accounts:
+                    self._logger.info(
+                        f"📊 Found {len(available_accounts)} available accounts:\n" +
+                        "\n".join([
+                            f"   ├─ Account {acc['id']}: Health={acc['health_score']}, "
+                            f"Comments={acc['comments_count']}, Last Activity={acc['last_activity']}"
+                            for acc in available_accounts[:3]  # Show top 3
+                        ])
+                    )
+                else:
+                    self._logger.warning("⚠️  No available accounts found in system")
+                
+                # Update account availability metrics
+                if self._metrics_exporter:
+                    busy_accounts = max(0, len(available_accounts) - 5)  # Estimate busy accounts
+                    avg_health = sum(acc['health_score'] for acc in available_accounts) / len(available_accounts) if available_accounts else 0
+                    self._metrics_exporter.update_account_availability(
+                        available=len(available_accounts),
+                        busy=busy_accounts,
+                        avg_health=avg_health
+                    )
+                
+                # Find best available account
+                account = await self._db.get_available_account(
+                    min_health_score=self._app_config.min_health_score,
+                    cooldown_hours=self._app_config.cooldown_hours
                 )
-            
-            # Find best available account
-            account = await self._db.get_available_account(
-                min_health_score=self._app_config.min_health_score,
-                cooldown_hours=self._app_config.cooldown_hours
-            )
+                
+            except Exception as db_error:
+                self._logger.error(f"❌ Database error: {db_error}")
+                # Update metrics to show database issues
+                if self._metrics_exporter:
+                    self._metrics_exporter.update_account_availability(
+                        available=0,
+                        busy=0,
+                        avg_health=0
+                    )
             
             if account:
                 # Log task assignment details
@@ -216,6 +231,9 @@ class TaskDistributionService:
                     # Record task completion (assignment phase)
                     if self._metrics_exporter:
                         self._metrics_exporter.record_task_completion(str(account['id']), 1.0, success=True)
+                        # Decrement pending tasks since task was assigned
+                        current_pending = self._metrics_exporter.pending_tasks_gauge._value._value if hasattr(self._metrics_exporter.pending_tasks_gauge, '_value') else 0
+                        self._metrics_exporter.update_pending_tasks(max(0, current_pending - 1))
                 else:
                     self._logger.error(
                         f"❌ TASK PUBLICATION FAILED\n"
@@ -225,10 +243,14 @@ class TaskDistributionService:
                         f"   └─ Action: Reducing account health score by 5"
                     )
                     # Reduce health score for failed task assignment
-                    await self._db.update_account_health(account['id'], -5)
+                    try:
+                        await self._db.update_account_health(account['id'], -5)
+                    except:
+                        pass  # Ignore health update errors
                     # Record failed task completion
                     if self._metrics_exporter:
                         self._metrics_exporter.record_task_completion(str(account['id']), 1.0, success=False)
+                        # Keep pending tasks count since task failed
             else:
                 # Log detailed information about no available accounts
                 self._logger.warning(
@@ -239,6 +261,17 @@ class TaskDistributionService:
                     f"   ├─ Cooldown Period: {self._app_config.cooldown_hours}h\n"
                     f"   └─ Status: Task queued for retry when accounts available"
                 )
+                # Only increment pending tasks when no accounts are available
+                if self._metrics_exporter:
+                    # Get current pending count and increment by 1
+                    current_pending = self._metrics_exporter.pending_tasks_gauge._value._value if hasattr(self._metrics_exporter.pending_tasks_gauge, '_value') else 0
+                    self._metrics_exporter.update_pending_tasks(current_pending + 1)
+            
+        except Exception as e:
+            self._logger.error(f"Error handling message: {e}")
+            # Update metrics to show error state
+            if self._metrics_exporter:
+                self._metrics_exporter.update_pending_tasks(1)
             
             # Commit message regardless of task assignment
             await self._consumer.commit_message(message)
@@ -246,6 +279,7 @@ class TaskDistributionService:
             # Log final status
             if account:
                 self._logger.info(
+                    f" TASK PROCESSING COMPLETED\n"
                     f"🏁 TASK PROCESSING COMPLETED\n"
                     f"   ├─ Channel: {channel_identifier}\n"
                     f"   ├─ Message ID: {message_id}\n"
