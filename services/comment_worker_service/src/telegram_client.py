@@ -87,8 +87,6 @@ class TelegramCommentClient:
                 try:
                     await self._client(JoinChannelRequest(chat))
                     self._logger.info(f"Joined channel {channel_username}")
-                except AlreadyInChannelError:
-                    pass  # Already joined
                 except Exception as e:
                     self._logger.warning(f"Failed to join channel {channel_username}: {e}")
             
@@ -121,6 +119,8 @@ class TelegramCommentClient:
             return False
             
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             self._logger.error(f"Failed to post comment: {e}")
             return False
 
