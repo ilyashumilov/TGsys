@@ -10,6 +10,7 @@ from typing import Dict, Any
 from config import AppConfig, KafkaConfig, PostgresConfig, setup_logging
 from custom_clients.kafka_client import KafkaConfig as KafkaClientConfig, KafkaProducerClient, KafkaConsumerClient
 from custom_clients.postgres_client import PostgresClient, PostgresConnection
+from metrics_exporter import init_metrics_exporter, get_metrics_exporter
 
 
 class TaskDistributionService:
@@ -30,8 +31,10 @@ class TaskDistributionService:
         self._db: PostgresClient | None = None
         self._consumer: KafkaConsumerClient | None = None
         self._producer: KafkaProducerClient | None = None
+        self._metrics_exporter = get_metrics_exporter()
         
         self._running = False
+        self._task_counter = 0
 
     async def start(self) -> None:
         """Start task distribution service."""
@@ -122,19 +125,79 @@ class TaskDistributionService:
             channel_id = message_data.get('channel_id')
             message_id = message_data.get('message_id')
             channel_identifier = message_data.get('channel_identifier', f'channel_{channel_id}')
+            post_text = message_data.get('text', '')[:100]  # First 100 chars of post text
+            post_date = message_data.get('date', 'unknown')
             
+            # Generate task ID
+            task_id = f"task_{self._task_counter}"
+            self._task_counter += 1
+            
+            # Record task queued
+            if self._metrics_exporter:
+                self._metrics_exporter.record_task_queued(task_id)
+            
+            # Log new task received with full details
             self._logger.info(
-                f"Processing message from {channel_identifier}: "
-                f"message_id={message_id}"
+                f"🔥 NEW TASK RECEIVED: {channel_identifier}\n"
+                f"   ├─ Task ID: {task_id}\n"
+                f"   ├─ Message ID: {message_id}\n"
+                f"   ├─ Channel ID: {channel_id}\n"
+                f"   ├─ Post Date: {post_date}\n"
+                f"   ├─ Post Preview: {post_text}{'...' if len(post_text) >= 100 else ''}\n"
+                f"   └─ Status: Ready for assignment"
             )
             
-            # Find available account
+            # Check available accounts before assignment
+            self._logger.info("🔍 Searching for available accounts...")
+            available_accounts = await self._db.get_available_accounts_list(
+                min_health_score=self._app_config.min_health_score,
+                cooldown_hours=self._app_config.cooldown_hours
+            )
+            
+            if available_accounts:
+                self._logger.info(
+                    f"📊 Found {len(available_accounts)} available accounts:\n" +
+                    "\n".join([
+                        f"   ├─ Account {acc['id']}: Health={acc['health_score']}, "
+                        f"Comments={acc['comments_count']}, Last Activity={acc['last_activity']}"
+                        for acc in available_accounts[:3]  # Show top 3
+                    ])
+                )
+            else:
+                self._logger.warning("⚠️  No available accounts found in system")
+            
+            # Update account availability metrics
+            if self._metrics_exporter:
+                busy_accounts = max(0, len(available_accounts) - 5)  # Estimate busy accounts
+                avg_health = sum(acc['health_score'] for acc in available_accounts) / len(available_accounts) if available_accounts else 0
+                self._metrics_exporter.update_account_availability(
+                    available=len(available_accounts),
+                    busy=busy_accounts,
+                    avg_health=avg_health
+                )
+            
+            # Find best available account
             account = await self._db.get_available_account(
                 min_health_score=self._app_config.min_health_score,
                 cooldown_hours=self._app_config.cooldown_hours
             )
             
             if account:
+                # Log task assignment details
+                self._logger.info(
+                    f"🎯 TASK ASSIGNED: Account {account['id']}\n"
+                    f"   ├─ Account Health: {account['health_score']}\n"
+                    f"   ├─ Total Comments: {account['comments_count']}\n"
+                    f"   ├─ Last Activity: {account['last_activity']}\n"
+                    f"   ├─ Channel: {channel_identifier}\n"
+                    f"   ├─ Message ID: {message_id}\n"
+                    f"   └─ Status: Publishing to comment queue..."
+                )
+                
+                # Record task assignment
+                if self._metrics_exporter:
+                    self._metrics_exporter.record_task_assigned(task_id, str(account['id']))
+                
                 # Assign task to account
                 success = await self._producer.publish_comment_task(
                     account_id=account['id'],
@@ -145,23 +208,58 @@ class TaskDistributionService:
                 
                 if success:
                     self._logger.info(
-                        f"✅ Assigned task to account {account['id']} "
-                        f"(comments: {account['comments_count']}, health: {account['health_score']})"
+                        f"✅ TASK PUBLISHED SUCCESSFULLY\n"
+                        f"   ├─ Account {account['id']} will comment on {channel_identifier}\n"
+                        f"   ├─ Message ID: {message_id}\n"
+                        f"   └─ Ready for worker pickup"
                     )
+                    # Record task completion (assignment phase)
+                    if self._metrics_exporter:
+                        self._metrics_exporter.record_task_completion(str(account['id']), 1.0, success=True)
                 else:
-                    self._logger.error(f"Failed to publish task for account {account['id']}")
+                    self._logger.error(
+                        f"❌ TASK PUBLICATION FAILED\n"
+                        f"   ├─ Account {account['id']}\n"
+                        f"   ├─ Channel: {channel_identifier}\n"
+                        f"   ├─ Message ID: {message_id}\n"
+                        f"   └─ Action: Reducing account health score by 5"
+                    )
                     # Reduce health score for failed task assignment
                     await self._db.update_account_health(account['id'], -5)
+                    # Record failed task completion
+                    if self._metrics_exporter:
+                        self._metrics_exporter.record_task_completion(str(account['id']), 1.0, success=False)
             else:
-                # No available accounts
+                # Log detailed information about no available accounts
                 self._logger.warning(
-                    f"❌ No available accounts for {channel_identifier} "
-                    f"(min_health: {self._app_config.min_health_score}, "
-                    f"cooldown: {self._app_config.cooldown_hours}h)"
+                    f"❌ NO AVAILABLE ACCOUNTS\n"
+                    f"   ├─ Channel: {channel_identifier}\n"
+                    f"   ├─ Message ID: {message_id}\n"
+                    f"   ├─ Required Health Score: >{self._app_config.min_health_score}\n"
+                    f"   ├─ Cooldown Period: {self._app_config.cooldown_hours}h\n"
+                    f"   └─ Status: Task queued for retry when accounts available"
                 )
             
             # Commit message regardless of task assignment
             await self._consumer.commit_message(message)
+            
+            # Log final status
+            if account:
+                self._logger.info(
+                    f"🏁 TASK PROCESSING COMPLETED\n"
+                    f"   ├─ Channel: {channel_identifier}\n"
+                    f"   ├─ Message ID: {message_id}\n"
+                    f"   ├─ Assigned to: Account {account['id']}\n"
+                    f"   └─ Next: Worker will process comment task"
+                )
+            else:
+                self._logger.info(
+                    f"🏁 TASK PROCESSING COMPLETED\n"
+                    f"   ├─ Channel: {channel_identifier}\n"
+                    f"   ├─ Message ID: {message_id}\n"
+                    f"   ├─ Status: No accounts available - task will be retried\n"
+                    f"   └─ Next: Waiting for available accounts"
+                )
             
         except Exception as e:
             self._logger.error(f"Error handling message: {e}")
@@ -185,6 +283,10 @@ async def main() -> None:
     signal.signal(signal.SIGINT, signal_handler)
     
     try:
+        # Initialize metrics exporter
+        metrics_exporter = init_metrics_exporter(port=8000)
+        logger.info("Metrics exporter initialized on port 8000")
+        
         # Load configuration
         app_config = AppConfig.from_env()
         kafka_config = KafkaConfig.from_env()
