@@ -64,9 +64,9 @@ class CommentWorkerService:
             if not await self._telegram_client.connect():
                 raise RuntimeError("Failed to connect to Telegram")
             
-            # Test connection
-            if not await self._telegram_client.test_connection():
-                raise RuntimeError("Telegram connection test failed")
+            # # Test connection
+            # if not await self._telegram_client.test_connection():
+            #     raise RuntimeError("Telegram connection test failed")
             
             # Initialize comment generator
             self._comment_generator = CommentGenerator()
