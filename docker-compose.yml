@@ -180,7 +180,7 @@ services:
     environment:
       POSTGRES_HOST: "postgres"
       DOCKER_HOST: "unix:///var/run/docker.sock"
-      WORKER_IMAGE: "comment_worker:latest"
+      WORKER_IMAGE: "tgsys_comment_worker_service"
       DOCKER_NETWORK: "tgsys_default"
       SESSIONS_DIR: "/app/sessions"
       TEMPLATE_SESSION_FILE: "/app/sessions/33093187_session.session"
