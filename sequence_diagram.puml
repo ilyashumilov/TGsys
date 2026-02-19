@@ -1,0 +1,132 @@
+@startuml TGsys Sequence Diagram
+!theme plain
+skinparam ParticipantPadding 20
+skinparam BoxPadding 20
+
+title TGsys Service Interactions - With Task Distribution & Worker Orchestration
+
+actor Admin
+participant "Telegram API" as Telegram
+participant "Channel Parser\nService" as Parser
+participant "PostgreSQL" as DB
+participant "Apache Kafka" as Kafka
+participant "Task Distribution\nService" as TaskDistributor
+participant "Worker Orchestrator\nService" as Orchestrator
+participant "Comment Worker\nContainers" as Worker
+participant "Session Files" as Sessions
+database "Proxy Servers" as Proxy
+
+== System Initialization ==
+Admin -> Orchestrator: Start Service
+Orchestrator -> DB: Load Active Accounts
+DB --> Orchestrator: Account List + Session Paths
+Orchestrator -> Orchestrator: Deploy Worker Containers
+note over Orchestrator: One container per account\nwith unique session file
+
+loop For Each Account
+    Orchestrator -> Worker: Start Container
+    Worker -> Sessions: Load {api_id}_session.session
+    Sessions --> Worker: Session Data + Proxy Info
+    Worker -> Kafka: Connect Consumer (account-specific)
+end
+
+Admin -> Parser: Start Service
+Parser -> DB: Load Channels
+DB --> Parser: Channel List
+Parser -> Kafka: Connect Producer
+
+Admin -> TaskDistributor: Start Service
+TaskDistributor -> DB: Load Accounts + Health Scores
+DB --> TaskDistributor: Account Status
+TaskDistributor -> Kafka: Connect Consumer + Producer
+
+== Main Processing Loop ==
+loop Every N seconds
+    Parser -> Telegram: Check Channels for New Posts
+    Telegram --> Parser: New Post Data (if any)
+    
+    alt New Post Found
+        Parser -> DB: Update Last Post ID
+        DB --> Parser: Success
+        
+        Parser -> Kafka: Publish LastPostEvent
+        Kafka --> Parser: Acknowledgment
+    end
+end
+
+== Task Distribution ==
+TaskDistributor -> Kafka: Subscribe to "telegram-last-post"
+Kafka --> TaskDistributor: New Post Event
+
+TaskDistributor -> DB: Query Available Accounts
+note right of TaskDistributor: WHERE last_comment_time < NOW() - INTERVAL '1 hour'\nAND health_score > 70\nAND is_active = true
+
+DB --> TaskDistributor: Available Accounts List
+
+alt Account Available
+    TaskDistributor -> TaskDistributor: Select Best Account\n(lowest comments_count)
+    
+    TaskDistributor -> Kafka: Publish CommentTask\n(account_id, channel_id, message_id)
+    
+    TaskDistributor -> Kafka: ACK LastPostEvent
+else No Available Accounts
+    TaskDistributor -> TaskDistributor: Log Warning
+    TaskDistributor -> Kafka: ACK LastPostEvent
+end
+
+== Comment Execution ==
+Worker -> Kafka: Subscribe to "comment-tasks"\n(account-specific filter)
+Kafka --> Worker: Assigned Task
+
+Worker -> Proxy: Establish Connection
+Proxy --> Worker: Connected
+
+Worker -> Worker: Generate Comment Content
+Worker -> Telegram: Post Comment via Proxy
+Telegram --> Worker: Success/Failure
+
+alt Success
+    Worker -> DB: Update Account Stats
+    note over DB: UPDATE telegram_accounts\nSET last_comment_time = NOW(),\ncomments_count = comments_count + 1,\nhealth_score = health_score + 1
+    
+    Worker -> Kafka: ACK CommentTask
+else Failure
+    Worker -> DB: Update Health Score
+    note over DB: UPDATE telegram_accounts\nSET health_score = health_score - 5
+    
+    Worker -> Kafka: No ACK (retry)
+end
+
+== Dynamic Worker Management ==
+Admin -> Orchestrator: Add New Account
+Orchestrator -> Sessions: Create Session File\n(copy template + customize)
+Orchestrator -> DB: Insert Account Record
+Orchestrator -> Orchestrator: Deploy New Worker Container
+
+Admin -> Orchestrator: Remove Account
+Orchestrator -> Worker: Stop Container
+Orchestrator -> DB: Deactivate Account
+
+== Health Monitoring ==
+TaskDistributor -> DB: Periodic Health Check
+DB --> TaskDistributor: Account Statistics
+TaskDistributor -> TaskDistributor: Update Health Scores
+
+Orchestrator -> Worker: Health Check
+Worker --> Orchestrator: Status Report
+Orchestrator -> DB: Update Account Health
+
+== Graceful Shutdown ==
+Admin -> Orchestrator: SIGTERM Signal
+Orchestrator -> Worker: Stop All Containers
+Orchestrator -> DB: Close Connection
+
+Admin -> Parser: SIGTERM Signal
+Parser -> Parser: Stop Processing Loop
+Parser -> Kafka: Close Producer
+
+Admin -> TaskDistributor: SIGTERM Signal
+TaskDistributor -> TaskDistributor: Finish Current Assignments
+TaskDistributor -> Kafka: Close Consumer + Producer
+
+@enduml

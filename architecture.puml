@@ -1,0 +1,162 @@
+@startuml TGsys Architecture
+!theme plain
+skinparam monochrome true
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam rectangle {
+  BorderColor #333333
+  BackgroundColor #F5F5F5
+}
+skinparam database {
+  BorderColor #333333
+  BackgroundColor #E8F4FD
+}
+skinparam queue {
+  BorderColor #333333
+  BackgroundColor #FFF8DC
+}
+skinparam cloud {
+  BorderColor #333333
+  BackgroundColor #F0FFF0
+}
+
+' External Services
+cloud "Telegram API" as telegram {
+  [Channel Posts]
+  [Comment Posting]
+}
+
+' Database Layer
+database "PostgreSQL" as postgres {
+  [telegram_channels\n(id, identifier, tg_channel_id,\n last_message_id, is_active)]
+  [telegram_accounts\n(id, api_id, api_hash, proxy_type,\n proxy_host, proxy_port, session_status,\n last_comment_time, comments_count, health_score,\n is_active)]
+}
+
+' Message Queue
+queue "Apache Kafka" as kafka {
+  [telegram-last-post\ntopic]
+  [comment-tasks\ntopic]
+}
+
+' Services
+rectangle "Services" as services {
+  [channel_parser_service\n\n• Watches Telegram channels\n• Detects new posts\n• Publishes to Kafka] as channel_parser
+  
+  [task_distribution_service\n\n• Account health monitoring\n• Rate limiting enforcement\n• Task assignment logic\n• Load balancing] as task_distributor
+  
+  [worker_orchestrator_service\n\n• Database-driven deployment\n• Dynamic worker scaling\n• Session file management\n• Container lifecycle] as orchestrator
+  
+  [comment_worker_containers\n\n• One container per account\n• Session-persistent connections\n• Account-specific task execution\n• Health status reporting] as comment_workers
+  
+  [kafka_logger\n\n• Logs all events\n• Monitoring] as logger
+}
+
+' Session Storage
+database "File System" as filesystem {
+  [sessions/\n{api_id}_session.session\n\n• Account session files\n• Proxy-bound connections] as sessions
+}
+
+' Data Flow
+telegram --> channel_parser : "1. Monitor channels"
+channel_parser --> postgres : "2. Update last_message_id"
+channel_parser --> kafka : "3. Publish LastPostEvent\n(channel_id, message_id, timestamp)"
+kafka --> task_distributor : "4. Consume events"
+kafka --> logger : "4. Log events"
+task_distributor --> postgres : "5. Get available accounts\n(1-hour cooldown check)"
+task_distributor --> kafka : "6. Publish CommentTask\n(account_id, channel_id, message_id)"
+kafka --> comment_workers : "7. Account-specific consumption"
+comment_workers --> filesystem : "8. Read session file\n{api_id}_session.session"
+comment_workers --> telegram : "9. Post comment\nvia proxy"
+comment_workers --> postgres : "10. Update account\n(last_comment_time, comments_count)"
+
+orchestrator --> postgres : "13. Load active accounts"
+orchestrator --> orchestrator : "14. Deploy worker containers\n(one per account)"
+orchestrator --> filesystem : "15. Create session files\nfrom template"
+
+' Task Distribution Details
+note right of task_distributor
+  Account Selection Logic:
+  • Check last_comment_time > 1 hour
+  • Health score filtering (>70%)
+  • Load balancing by comments_count
+  • Proxy health verification
+  • Simple retry on Kafka failure
+end note
+
+' Account-Proxy Binding Details
+note bottom of postgres
+  Account-Proxy Relationship:
+  Each telegram_accounts record has:
+  - proxy_type (socks5/http)
+  - proxy_host 
+  - proxy_port
+  - proxy_username/password
+  
+  Permanent 1:1 binding ensures:
+  - Consistent IP per account
+  - Better account reputation
+  - Lower ban risk
+end note
+
+' Event Flow Details
+note top of kafka
+  Event Format:
+  {
+    "channel_id": 12345,
+    "message_id": 67890,
+    "channel_identifier": "@channel",
+    "timestamp": 1642694400
+  }
+  
+  • Manual acknowledgment
+  • No message loss
+  • Exactly-once processing
+end note
+
+' Worker Orchestrator Details
+note right of orchestrator
+  Database-Driven Deployment:
+  • Load accounts from PostgreSQL
+  • Create session files from template
+  • Deploy one container per account
+  • Dynamic scaling (add/remove accounts)
+  • Container lifecycle management
+  • Health monitoring & restarts
+end note
+
+' Worker Container Details
+note right of comment_workers
+  Account-Specific Containers:
+  • 1 container = 1 Telegram account
+  • Persistent session connections
+  • Account-specific Kafka consumer
+  • Fixed proxy binding
+  • Health status reporting
+  • Independent scaling
+end note
+
+' Event Flow Details
+note top of kafka
+  Kafka Topics:
+  
+  telegram-last-post:
+  {
+    "channel_id": 12345,
+    "message_id": 67890,
+    "timestamp": 1642694400
+  }
+  
+  comment-tasks:
+  {
+    "account_id": 42,
+    "channel_id": 12345,
+    "message_id": 67890,
+    "task_id": "uuid"
+  }
+  
+  • Manual acknowledgment
+  • Exactly-once processing
+  • Task retry on failure
+end note
+
+@enduml

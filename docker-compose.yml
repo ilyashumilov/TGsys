@@ -6,74 +6,190 @@ services:
     container_name: postgres
     env_file: .env
     ports:
-      - "${POSTGRES_PORT}:${POSTGRES_PORT}"
+      - "${POSTGRES_PORT:-5432}:${POSTGRES_PORT:-5432}"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
 
   zookeeper:
     image: confluentinc/cp-zookeeper:7.9.1
     container_name: zookeeper
     ports:
-      - "${ZOOKEEPER_PORT}:${ZOOKEEPER_PORT}"
+      - "${ZOOKEEPER_PORT:-2181}:${ZOOKEEPER_PORT:-2181}"
     environment:
-      ZOOKEEPER_CLIENT_PORT: ${ZOOKEEPER_PORT}
+      ZOOKEEPER_CLIENT_PORT: ${ZOOKEEPER_PORT:-2181}
       ZOOKEEPER_TICK_TIME: 2000
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "${ZOOKEEPER_PORT:-2181}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
 
   kafka:
     image: confluentinc/cp-kafka:7.9.1
     container_name: kafka
     ports:
-      - "${KAFKA_PORT}:${KAFKA_PORT}"
+      - "${KAFKA_PORT:-9092}:${KAFKA_PORT:-9092}"
     depends_on:
-      - zookeeper
+      zookeeper:
+        condition: service_healthy
     environment:
       KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: "zookeeper:${ZOOKEEPER_PORT}"
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:${KAFKA_PORT}
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:${KAFKA_PORT}
+      KAFKA_ZOOKEEPER_CONNECT: "zookeeper:${ZOOKEEPER_PORT:-2181}"
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:${KAFKA_PORT:-9092}
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:${KAFKA_PORT:-9092}
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:${KAFKA_PORT:-9092}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
 
   channel_parser_service:
     build: ./services/channel_parser_service
     container_name: channel_parser_service
     env_file: .env
     depends_on:
-      - kafka
-      - postgres
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
     environment:
-      KAFKA_BROKER: "kafka:${KAFKA_PORT}"
+      KAFKA_BROKER: "kafka:${KAFKA_PORT:-9092}"
       KAFKA_TOPIC: "telegram-last-post"
       POSTGRES_HOST: "postgres"
     volumes:
       - ./sessions:/sessions
     command: sh -c "sleep 20 && python src/main.py"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
 
   kafka_logger:
     build: ./services/channel_parser_service
     container_name: kafka_logger
     env_file: .env
     depends_on:
-      - kafka
+      kafka:
+        condition: service_healthy
     environment:
-      KAFKA_BROKER: "kafka:${KAFKA_PORT}"
+      KAFKA_BROKER: "kafka:${KAFKA_PORT:-9092}"
       KAFKA_TOPIC: "telegram-last-post"
       KAFKA_CONSUMER_START_DELAY: "20"
     command: python src/logger_consumer.py
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+        reservations:
+          memory: 64M
 
-  post_commenter_service:
-    build: ./services/post_commenter_service
-    container_name: post_commenter_service
+  task_distribution_service:
+    build: ./services/task_distribution_service
+    container_name: task_distribution_service
     env_file: .env
     depends_on:
-      - kafka
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
     environment:
-      KAFKA_BROKER: "kafka:${KAFKA_PORT}"
+      KAFKA_BROKER: "kafka:${KAFKA_PORT:-9092}"
       KAFKA_TOPIC: "telegram-last-post"
-      KAFKA_CONSUMER_GROUP: "post-commenter-group"
+      KAFKA_CONSUMER_GROUP: "task-distributor-group"
       KAFKA_CONSUMER_START_DELAY: "25"
+      POSTGRES_HOST: "postgres"
       LOG_LEVEL: "INFO"
+      MIN_HEALTH_SCORE: "70"
+      COOLDOWN_HOURS: "1"
+      MAX_RETRIES: "3"
+      RETRY_DELAY: "5"
+    command: sh -c "sleep 30 && python src/main.py"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
+
+  worker_orchestrator_service:
+    build: ./services/worker_orchestrator_service
+    container_name: worker_orchestrator_service
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./sessions:/app/sessions
+    environment:
+      POSTGRES_HOST: "postgres"
+      DOCKER_BASE_URL: "unix:///var/run/docker.sock"
+      WORKER_IMAGE: "comment_worker:latest"
+      DOCKER_NETWORK: "tgsys_default"
+      SESSIONS_DIR: "/app/sessions"
+      TEMPLATE_SESSION_FILE: "/app/sessions/33093187_session.session"
+      HEALTH_CHECK_INTERVAL: "60"
+      MAX_RETRIES: "3"
+      LOG_LEVEL: "INFO"
+    command: sh -c "sleep 35 && python src/main.py"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
 
 volumes:
   postgres_data:

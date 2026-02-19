@@ -1,3 +1,4 @@
 kafka-python==2.0.2
 psycopg2-binary==2.9.9
 telethon==1.34.0
+psutil==5.9.6

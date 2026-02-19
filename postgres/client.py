@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import logging
+from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any, Iterable
 
 import psycopg2
 import psycopg2.extras
+import psycopg2.pool
 
 
 @dataclass(frozen=True)
@@ -18,41 +21,64 @@ class PostgresConnection:
 
 class PostgresClient:
     """
-    Small sync DB helper with basic CRUD-style utilities.
-    Intended to be reused by multiple services.
+    Enhanced DB helper with connection pooling and basic CRUD-style utilities.
+    Intended to be reused across multiple services.
     """
 
-    def __init__(self, conn: PostgresConnection):
+    def __init__(self, conn: PostgresConnection, min_conn: int = 1, max_conn: int = 10):
         self._conn = conn
-
-    def _connect(self):
-        return psycopg2.connect(
-            host=self._conn.host,
-            port=self._conn.port,
-            dbname=self._conn.db,
-            user=self._conn.user,
-            password=self._conn.password,
+        self._logger = logging.getLogger(__name__)
+        self._pool = psycopg2.pool.ThreadedConnectionPool(
+            min_conn, max_conn,
+            host=conn.host,
+            port=conn.port,
+            dbname=conn.db,
+            user=conn.user,
+            password=conn.password,
         )
+        self._logger.info(f"Initialized connection pool: {min_conn}-{max_conn} connections")
+
+    @contextmanager
+    def _get_connection(self):
+        """Get a connection from the pool."""
+        conn = None
+        try:
+            conn = self._pool.getconn()
+            yield conn
+        except Exception as e:
+            if conn:
+                conn.rollback()
+            self._logger.error(f"Database connection error: {e}")
+            raise
+        finally:
+            if conn:
+                self._pool.putconn(conn)
 
     def fetch_all(self, sql: str, params: Iterable[Any] | None = None) -> list[dict[str, Any]]:
-        with self._connect() as conn:
+        with self._get_connection() as conn:
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
                 cur.execute(sql, params)
                 rows = cur.fetchall()
                 return [dict(r) for r in rows]
 
     def fetch_one(self, sql: str, params: Iterable[Any] | None = None) -> dict[str, Any] | None:
-        with self._connect() as conn:
+        with self._get_connection() as conn:
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
                 cur.execute(sql, params)
                 row = cur.fetchone()
                 return dict(row) if row is not None else None
 
     def execute(self, sql: str, params: Iterable[Any] | None = None) -> None:
-        with self._connect() as conn:
+        with self._get_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(sql, params)
             conn.commit()
+
+    def close(self) -> None:
+        """Close all connections in the pool."""
+        if self._pool:
+            self._pool.closeall()
+            self._logger.info("Database connection pool closed")
 
 
 class BaseRepository:

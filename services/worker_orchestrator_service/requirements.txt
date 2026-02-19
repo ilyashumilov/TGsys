@@ -1,0 +1,7 @@
+asyncio
+asyncpg
+docker
+psycopg2-binary
+python-dotenv
+telethon
+pydantic

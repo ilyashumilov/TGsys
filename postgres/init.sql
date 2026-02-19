@@ -15,9 +15,55 @@ INSERT INTO telegram_channels (identifier) VALUES
   ('@telegram')
 ON CONFLICT (identifier) DO NOTHING;
 
--- Update updated_at automatically (simple approach: update it in app)
+-- Telegram accounts for comment posting
+CREATE TABLE IF NOT EXISTS telegram_accounts (
+  id BIGSERIAL PRIMARY KEY,
+  api_id BIGINT NOT NULL UNIQUE,
+  api_hash TEXT NOT NULL,
+  phone_number TEXT,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  last_comment_time TIMESTAMPTZ,
+  comments_count INTEGER NOT NULL DEFAULT 0,
+  health_score INTEGER NOT NULL DEFAULT 100 CHECK (health_score >= 0 AND health_score <= 100),
+  session_status TEXT NOT NULL DEFAULT 'unknown', -- 'authorized', 'session_missing', 'banned', etc.
+  proxy_type TEXT, -- 'http', 'socks4', 'socks5'
+  proxy_host TEXT,
+  proxy_port INTEGER,
+  proxy_username TEXT,
+  proxy_password TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 
--- You can add more channels like this:
--- INSERT INTO telegram_channels (identifier) VALUES ('@yourchannel');
--- INSERT INTO telegram_channels (identifier) VALUES ('https://t.me/yourchannel');
+-- Performance indexes
+CREATE INDEX IF NOT EXISTS idx_telegram_accounts_active ON telegram_accounts(is_active, session_status, health_score) 
+WHERE is_active = TRUE AND session_status = 'authorized' AND health_score > 70;
 
+CREATE INDEX IF NOT EXISTS idx_telegram_accounts_selection ON telegram_accounts(last_comment_time, comments_count, health_score) 
+WHERE is_active = TRUE AND health_score > 70;
+
+CREATE INDEX IF NOT EXISTS idx_telegram_accounts_cooldown 
+ON telegram_accounts(last_comment_time) 
+WHERE is_active = TRUE;
+
+CREATE INDEX IF NOT EXISTS idx_telegram_channels_active 
+ON telegram_channels(is_active, created_at) 
+WHERE is_active = TRUE;
+
+-- Create updated_at trigger function
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+-- Add triggers for updated_at
+CREATE TRIGGER update_telegram_channels_updated_at 
+    BEFORE UPDATE ON telegram_channels 
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_telegram_accounts_updated_at 
+    BEFORE UPDATE ON telegram_accounts 
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

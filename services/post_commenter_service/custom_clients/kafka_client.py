@@ -76,6 +76,7 @@ class KafkaConsumerClient:
         config: KafkaConfig,
         group_id: str | None = None,
         auto_offset_reset: str = "earliest",
+        enable_auto_commit: bool = True,
     ):
         self._config = config
         self._consumer = KafkaConsumer(
@@ -83,7 +84,7 @@ class KafkaConsumerClient:
             bootstrap_servers=[config.broker],
             group_id=group_id,
             auto_offset_reset=auto_offset_reset,
-            enable_auto_commit=True,
+            enable_auto_commit=enable_auto_commit,
             value_deserializer=lambda v: v.decode("utf-8") if v is not None else "",
         )
 
@@ -103,6 +104,10 @@ class KafkaConsumerClient:
 
     def close(self) -> None:
         self._consumer.close()
+
+    def commit(self) -> None:
+        """Manually commit the current offset."""
+        self._consumer.commit()
 
     def __enter__(self) -> "KafkaConsumerClient":
         return self
