@@ -41,22 +41,10 @@ class TelegramCommentClient:
                         proxy_username,
                         proxy_password
                     )
-            if not os.path.exists(self.session_file) and self.tdata_path:
-                loader = TDataSessionLoader(self.tdata_path, self.session_file)
-                self._client = await loader.load_client()
-                # Set proxy if configured
-                if proxy:
-                    # Note: Telethon clients from tdata may need proxy handling differently
-                    pass  # Proxy already set if needed during loading
-            else:
-                self._client = TelegramClient(
-                    self.session_file,
-                    self._api_id,
-                    self._api_hash,
-                    proxy=proxy
-                )
-            await self._client.connect()
 
+            loader = TDataSessionLoader(self.tdata_path, self.session_file)
+            self._client = await loader.load_client()
+            
             await client.PrintSessions()
 
             # Check if authorized
