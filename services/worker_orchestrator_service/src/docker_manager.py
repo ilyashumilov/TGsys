@@ -56,7 +56,7 @@ class DockerManager:
                 name=container_name,
                 environment=environment,
                 volumes={
-                    "/root/tgsys/sessions": {
+                    os.getenv("SESSIONS_HOST_DIR", "/Users/admin/Desktop/TGsys/sessions"): {
                         "bind": "/app/sessions", 
                         "mode": "rw"
                     }

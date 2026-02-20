@@ -190,6 +190,7 @@ services:
       DOCKER_NETWORK: "tgsys_default"
       SESSIONS_DIR: "/app/sessions"
       TEMPLATE_SESSION_FILE: "/app/sessions/33093187_session.session"
+      SESSIONS_HOST_DIR: "${SESSIONS_HOST_DIR:-/Users/admin/Desktop/TGsys/sessions}"
       HEALTH_CHECK_INTERVAL: "60"
       MAX_RETRIES: "3"
       LOG_LEVEL: "INFO"
