@@ -104,7 +104,7 @@ class WorkerOrchestrator:
             tdata_dir = Path(self._app_config.sessions_dir) / "tdata"
             accounts = []
             for i, subdir in enumerate(sorted(tdata_dir.iterdir())):
-                if subdir.is_dir():
+                if subdir.is_dir() and subdir.name.startswith('account'):
                     account_name = subdir.name
                     accounts.append({'id': i+1, 'account_name': account_name})
             self._logger.info(f"Found {len(accounts)} tdata accounts")
@@ -137,9 +137,6 @@ class WorkerOrchestrator:
             account_name=account['account_name'],
             phone_number=account.get('phone_number')
         )
-        
-        if not self._session_manager.validate_session_file(session_path):
-            raise ValueError(f"Invalid session file: {session_path}")
         
         # Deploy worker container
         await self._docker_manager.deploy_worker_for_account(
