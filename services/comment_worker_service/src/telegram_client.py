@@ -44,8 +44,8 @@ class TelegramCommentClient:
 
             loader = TDataSessionLoader(self.tdata_path, self.session_file)
             self._client = await loader.load_client()
-            
-            await client.PrintSessions()
+
+            await self._client.PrintSessions()
 
             # Check if authorized
             if not await self._client.is_user_authorized():
