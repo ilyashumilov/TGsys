@@ -2,19 +2,26 @@ from __future__ import annotations
 
 import os
 import logging
+import sys
 from typing import Optional
 from telethon import TelegramClient
 from telethon.tl.functions.channels import JoinChannelRequest
 from telethon.errors import FloodWaitError, ChatWriteForbiddenError, UserDeactivatedBanError, UserDeactivatedError, PhoneNumberBannedError, AuthKeyUnregisteredError
 
+# Add project root to path for imports
+sys.path.append('/Users/admin/Desktop/TGsys')
+
+from shared.telegram_session_loader import TDataSessionLoader
+
 
 class TelegramCommentClient:
     """Telegram client for posting comments."""
 
-    def __init__(self, api_id: int, api_hash: str, session_file: str):
+    def __init__(self, api_id: int, api_hash: str, session_file: str, tdata_path: str = None):
         self._api_id = api_id
         self._api_hash = api_hash
         self.session_file = session_file
+        self.tdata_path = tdata_path
         self._logger = logging.getLogger(__name__)
         self._client: Optional[TelegramClient] = None
 
@@ -39,6 +46,11 @@ class TelegramCommentClient:
                         proxy_username,
                         proxy_password
                     )
+            
+            # Load session from tdata if not exists
+            if not os.path.exists(self.session_file) and self.tdata_path:
+                loader = TDataSessionLoader(self.tdata_path, self.session_file)
+                await loader.load_client()
             
             # Create client
             self._client = TelegramClient(

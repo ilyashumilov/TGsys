@@ -5,3 +5,4 @@ pydantic
 telethon
 requests
 PySocks
+opentele

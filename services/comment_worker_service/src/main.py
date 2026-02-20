@@ -58,7 +58,8 @@ class CommentWorkerService:
             self._telegram_client = TelegramCommentClient(
                 self._telegram_config.api_id,
                 self._telegram_config.api_hash,
-                self._telegram_config.session_file
+                self._telegram_config.session_file,
+                tdata_path=self._telegram_config.tdata_path
             )
             
             if not await self._telegram_client.connect():
