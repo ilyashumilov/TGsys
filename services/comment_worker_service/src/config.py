@@ -32,7 +32,7 @@ class TelegramConfig:
     def from_env(cls) -> "TelegramConfig":
         api_id = int(os.getenv("TELEGRAM_API_ID", "0"))
         api_hash = os.getenv("TELEGRAM_API_HASH", "dummy")
-        session_file = os.getenv("SESSION_FILE", "/app/sessions/default_session.session")
+        session_file = os.getenv("TELEGRAM_SESSION_PATH", "/app/sessions/default_session.session")
         tdata_path = os.getenv("TELEGRAM_TDATA_PATH", "/app/sessions/tdata/default/tdata")
 
         return cls(api_id=api_id, api_hash=api_hash, session_file=session_file, tdata_path=tdata_path)
