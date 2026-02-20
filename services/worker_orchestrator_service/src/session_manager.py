@@ -41,8 +41,8 @@ class SessionManager:
                 self._logger.error(f"Failed to copy template session: {e}")
                 raise
         else:
-            self._logger.error(f"Template session file not found: {self.template_session_path}")
-            raise FileNotFoundError(f"Template session file not found: {self.template_session_path}")
+            self._logger.info(f"No template session found. Worker will load from tdata for account {account_name}.")
+            return str(session_path)
 
     def validate_session_file(self, session_path: str) -> bool:
         """Validate session file integrity."""
