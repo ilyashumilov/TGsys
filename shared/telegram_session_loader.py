@@ -28,6 +28,9 @@ class TDataSessionLoader:
         :return: Authenticated Telethon TelegramClient.
         :raises AssertionError: If no accounts are loaded from tdata.
         """
+
+
+        print('folder:', self.tdata_folder)
         # Load TDesktop client from tdata folder
         tdesk = TDesktop(self.tdata_folder)
         
