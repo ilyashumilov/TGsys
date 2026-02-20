@@ -175,6 +175,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      kafka:
+        condition: service_healthy
     volumes:
       - ./sessions:/app/sessions
       - /var/run/docker.sock:/var/run/docker.sock

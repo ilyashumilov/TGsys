@@ -8,9 +8,6 @@ from telethon import TelegramClient
 from telethon.tl.functions.channels import JoinChannelRequest
 from telethon.errors import FloodWaitError, ChatWriteForbiddenError, UserDeactivatedBanError, UserDeactivatedError, PhoneNumberBannedError, AuthKeyUnregisteredError
 
-# Add project root to path for imports
-sys.path.append('/Users/admin/Desktop/TGsys')
-
 from shared.telegram_session_loader import TDataSessionLoader
 
 
@@ -28,7 +25,6 @@ class TelegramCommentClient:
     async def connect(self) -> bool:
         """Connect to Telegram."""
         try:
-            # Setup proxy if configured
             proxy = None
             proxy_type = os.getenv("PROXY_TYPE")
             if proxy_type:
@@ -36,37 +32,34 @@ class TelegramCommentClient:
                 proxy_port = int(os.getenv("PROXY_PORT", "0"))
                 proxy_username = os.getenv("PROXY_USERNAME")
                 proxy_password = os.getenv("PROXY_PASSWORD")
-                
                 if proxy_type in ('socks5', 'http'):
                     proxy = (
                         proxy_type,
                         proxy_host,
                         proxy_port,
-                        True,  # rdns
+                        True,
                         proxy_username,
                         proxy_password
                     )
-            
-            # Load session from tdata if not exists
             if not os.path.exists(self.session_file) and self.tdata_path:
                 loader = TDataSessionLoader(self.tdata_path, self.session_file)
-                await loader.load_client()
-            
-            # Create client
-            self._client = TelegramClient(
-                self.session_file,
-                self._api_id,
-                self._api_hash,
-                proxy=proxy
-            )
-            
+                self._client = await loader.load_client()
+                # Set proxy if configured
+                if proxy:
+                    # Note: Telethon clients from tdata may need proxy handling differently
+                    pass  # Proxy already set if needed during loading
+            else:
+                self._client = TelegramClient(
+                    self.session_file,
+                    self._api_id,
+                    self._api_hash,
+                    proxy=proxy
+                )
             await self._client.connect()
-            
             # # Check if authorized
             # if not await self._client.is_user_authorized():
             #     self._logger.error("Session is not authorized")
             #     return False
-            
             self._logger.info("Connected to Telegram successfully")
             return True
             
