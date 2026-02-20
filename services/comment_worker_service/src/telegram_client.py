@@ -5,7 +5,7 @@ import logging
 from typing import Optional
 from telethon import TelegramClient
 from telethon.tl.functions.channels import JoinChannelRequest
-from telethon.errors import FloodWaitError, ChatWriteForbiddenError, UserDeactivatedBanError, UserDeactivatedError, PhoneNumberBannedError
+from telethon.errors import FloodWaitError, ChatWriteForbiddenError, UserDeactivatedBanError, UserDeactivatedError, PhoneNumberBannedError, AuthKeyUnregisteredError
 
 
 class TelegramCommentClient:
@@ -116,6 +116,10 @@ class TelegramCommentClient:
             
         except (UserDeactivatedBanError, UserDeactivatedError, PhoneNumberBannedError):
             self._logger.error("Account is banned or deactivated")
+            return False
+            
+        except AuthKeyUnregisteredError:
+            self._logger.error("Session is invalid or expired")
             return False
             
         except Exception as e:

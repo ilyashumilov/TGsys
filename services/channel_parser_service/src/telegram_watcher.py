@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import shutil
+import sys
 import time
 from dataclasses import dataclass
 from typing import Any
@@ -15,14 +17,17 @@ from channel_repository import ChannelRepository, TrackedChannel
 from config import TelegramConfig
 from custom_clients.kafka_client import KafkaConfig, KafkaProducerClient
 
+from shared.telegram_session_loader import TDataSessionLoader
+
 
 class TelegramSessionManager:
     """
     Ensures the service uses a pre-authorized Telethon session file.
     """
 
-    def __init__(self, session_path: str):
+    def __init__(self, session_path: str, tdata_path: str = None):
         self._session_path = session_path
+        self._tdata_path = tdata_path
 
     def telethon_session_name(self) -> str:
         # Telethon appends ".session" for string session names, so strip it if provided.
@@ -46,10 +51,15 @@ class TelegramSessionManager:
             self._session_path if self._session_path.endswith(".session") else f"{self._session_path}.session"
         )
         if not os.path.exists(expected_file):
-            raise RuntimeError(
-                f"Telegram session file not found at {expected_file!r}. "
-                f"Mount your authorized session file into the container and set TELEGRAM_SESSION_PATH."
-            )
+            if self._tdata_path:
+                # Load from tdata
+                loader = TDataSessionLoader(self._tdata_path, self._session_path)
+                asyncio.run(loader.load_client())  # This will create the session file
+            else:
+                raise RuntimeError(
+                    f"Telegram session file not found at {expected_file!r}. "
+                    f"Mount your authorized session file into the container or set TELEGRAM_TDATA_PATH to load from tdata."
+                )
 
 
 @dataclass(frozen=True)
@@ -84,7 +94,7 @@ class TelegramChannelWatcher:
         self._repo = repo
         self._producer = producer
         self._tick_seconds = tick_seconds
-        self._session = TelegramSessionManager(tg_config.session_path)
+        self._session = TelegramSessionManager(tg_config.session_path, tg_config.tdata_path)
 
         self._channel_id_by_peer: dict[int, int] = {}
         self._entity_by_channel_row_id: dict[int, Any] = {}

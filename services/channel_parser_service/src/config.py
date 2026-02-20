@@ -40,14 +40,16 @@ class TelegramConfig:
     api_id: int
     api_hash: str
     session_path: str
+    tdata_path: str
 
     @classmethod
     def from_env(cls) -> "TelegramConfig":
         api_id = int(os.getenv("TELEGRAM_API_ID", "0"))
         api_hash = os.getenv("TELEGRAM_API_HASH", "dummy")
         session_path = os.getenv("TELEGRAM_SESSION_PATH", "/sessions/channel_parser_session.session")
+        tdata_path = os.getenv("TELEGRAM_TDATA_PATH", "/sessions/tdata/channel_parser/tdata")
 
-        return cls(api_id=api_id, api_hash=api_hash, session_path=session_path)
+        return cls(api_id=api_id, api_hash=api_hash, session_path=session_path, tdata_path=tdata_path)
 
 
 @dataclass(frozen=True)
