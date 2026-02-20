@@ -58,8 +58,8 @@ class WorkerOrchestrator:
             # Initialize Docker manager
             self._docker_manager = DockerManager()
             
-            # Deploy workers for all active accounts
-            await self.sync_workers_with_database()
+            # Deploy workers for all tdata accounts
+            await self.sync_workers_with_tdata()
             
             # Start health monitoring
             self._running = True
@@ -94,14 +94,20 @@ class WorkerOrchestrator:
         
         self._logger.info("Worker Orchestrator Service stopped")
 
-    async def sync_workers_with_database(self) -> None:
-        """Deploy workers for all active accounts in database."""
-        if not self._db or not self._session_manager or not self._docker_manager:
+    async def sync_workers_with_tdata(self) -> None:
+        """Deploy workers for all accounts found in tdata folder."""
+        if not self._session_manager or not self._docker_manager:
             raise RuntimeError("Service not properly initialized")
         
         try:
-            accounts = await self._db.get_active_accounts()
-            self._logger.info(f"Found {len(accounts)} active accounts")
+            from pathlib import Path
+            tdata_dir = Path(self._app_config.sessions_dir) / "tdata"
+            accounts = []
+            for i, subdir in enumerate(sorted(tdata_dir.iterdir())):
+                if subdir.is_dir():
+                    account_name = subdir.name
+                    accounts.append({'id': i+1, 'account_name': account_name})
+            self._logger.info(f"Found {len(accounts)} tdata accounts")
             
             # Deploy workers for each account
             for account in accounts:
@@ -116,7 +122,7 @@ class WorkerOrchestrator:
                 self._logger.info(f"Cleaned up {len(dead_accounts)} dead worker containers")
                 
         except Exception as e:
-            self._logger.error(f"Failed to sync workers with database: {e}")
+            self._logger.error(f"Failed to sync workers with tdata: {e}")
             raise
 
     async def _deploy_worker_for_account(self, account: Dict[str, Any]) -> None:
