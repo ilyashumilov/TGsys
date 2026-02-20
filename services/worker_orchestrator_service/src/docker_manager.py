@@ -29,7 +29,7 @@ class DockerManager:
         try:
             environment = {
                 "ACCOUNT_ID": str(account_id),
-                "TELEGRAM_SESSION_PATH": f"/app/sessions/{account_data['account_name']}_session.session",
+                "TELEGRAM_SESSION_PATH": f"/app/sessions/{account_data['account_name']}.session",
                 "TELEGRAM_TDATA_PATH": f"/app/sessions/tdata/{account_data['account_name']}/tdata",
                 "TELEGRAM_API_ID": os.getenv("WORKER_API_ID", "10840"),
                 "TELEGRAM_API_HASH": os.getenv("WORKER_API_HASH", "8e2e4c60c6ba4c7f7b9d4e4e6f0c0a2a"),

@@ -24,7 +24,7 @@ class SessionManager:
         phone_number: Optional[str] = None
     ) -> str:
         """Create session file for new account using template."""
-        session_path = self.sessions_dir / f"{account_name}_session.session"
+        session_path = self.sessions_dir / f"{account_name}.session"
         
         if session_path.exists():
             self._logger.info(f"Session file already exists: {session_path}")
