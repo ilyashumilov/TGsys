@@ -56,10 +56,13 @@ class TelegramCommentClient:
                     proxy=proxy
                 )
             await self._client.connect()
-            # # Check if authorized
-            # if not await self._client.is_user_authorized():
-            #     self._logger.error("Session is not authorized")
-            #     return False
+
+            await client.PrintSessions()
+
+            # Check if authorized
+            if not await self._client.is_user_authorized():
+                self._logger.error("Session is not authorized")
+                return False
             self._logger.info("Connected to Telegram successfully")
             return True
             
