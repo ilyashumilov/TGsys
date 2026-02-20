@@ -1,7 +1,10 @@
 #!/bin/bash
 
+#!/bin/bash
+
 # Останавливаем текущие контейнеры
 echo "Останавливаем существующие контейнеры..."
+docker stop $(docker ps -q --filter name=comment_worker) || true
 docker-compose down
 
 # Пересобираем образы
