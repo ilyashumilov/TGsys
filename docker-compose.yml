@@ -106,7 +106,9 @@ services:
           memory: 128M
 
   kafka_logger:
-    build: ./services/channel_parser_service
+    build:
+      context: .
+      dockerfile: ./services/channel_parser_service/Dockerfile
     container_name: kafka_logger
     env_file: .env
     depends_on:
