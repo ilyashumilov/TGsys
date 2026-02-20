@@ -102,11 +102,11 @@ class WorkerOrchestrator:
         try:
             from pathlib import Path
             tdata_dir = Path(self._app_config.sessions_dir) / "tdata"
+            matching_subdirs = sorted([d for d in tdata_dir.iterdir() if d.is_dir() and d.name.startswith('account')])
             accounts = []
-            for i, subdir in enumerate(sorted(tdata_dir.iterdir())):
-                if subdir.is_dir() and subdir.name.startswith('account'):
-                    account_name = subdir.name
-                    accounts.append({'id': i+1, 'account_name': account_name})
+            for i, subdir in enumerate(matching_subdirs):
+                account_name = subdir.name
+                accounts.append({'id': i+1, 'account_name': account_name})
             self._logger.info(f"Found {len(accounts)} tdata accounts")
             
             # Deploy workers for each account
