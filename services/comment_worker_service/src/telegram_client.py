@@ -92,6 +92,9 @@ class TelegramCommentClient:
                 self._logger.error(f"Message {message_id} not found in {channel_username}")
                 return False
             
+            self._logger.info("hasattr(chat, 'linked_chat_id'): %s", hasattr(chat, 'linked_chat_id'))
+            self._logger.info("chat.linked_chat_id: %s", chat.linked_chat_id)
+
             # Post comment as reply
             if hasattr(chat, 'linked_chat_id') and chat.linked_chat_id:
                 await self._client.send_message(chat.linked_chat_id, comment_text, reply_to_msg_id=message.id)
