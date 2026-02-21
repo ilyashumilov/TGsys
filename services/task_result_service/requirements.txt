@@ -1,0 +1,5 @@
+asyncio
+aiokafka
+psycopg2-binary
+python-dotenv
+pydantic

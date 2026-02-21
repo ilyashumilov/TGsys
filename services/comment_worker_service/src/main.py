@@ -48,6 +48,7 @@ class CommentWorkerService:
                 KafkaConsumerConfig(
                     broker=self._kafka_config.broker,
                     topic=self._kafka_config.topic,
+                    result_topic=self._kafka_config.result_topic,
                     consumer_group=self._kafka_config.consumer_group,
                     consumer_start_delay=self._kafka_config.consumer_start_delay
                 ),
@@ -142,6 +143,18 @@ class CommentWorkerService:
                 self._logger.info(
                     f"✅ Task {task_id} completed successfully"
                 )
+                
+                # Send result to result_topic
+                result_data = {
+                    'task_id': task_id,
+                    'account_id': self._app_config.account_id,
+                    'channel_id': channel_id,
+                    'channel_identifier': channel_identifier,
+                    'message_id': message_id,
+                    'success': True,
+                    'timestamp': time.time()
+                }
+                await self._consumer.send_result(result_data)
                 
                 # Commit message
                 await self._consumer.commit_message(message)

@@ -208,6 +208,37 @@ services:
         reservations:
           memory: 256M
 
+  task_result_service:
+    build: ./services/task_result_service
+    container_name: task_result_service
+    env_file: .env
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKER: "kafka:${KAFKA_PORT:-9092}"
+      KAFKA_RESULT_TOPIC: "task-results"
+      KAFKA_TOPIC: "comment-tasks"
+      KAFKA_CONSUMER_GROUP: "result-processor"
+      KAFKA_CONSUMER_START_DELAY: "30"
+      POSTGRES_HOST: "postgres"
+      LOG_LEVEL: "INFO"
+    command: sh -c "sleep 35 && python src/main.py"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
+
   # Monitoring Stack
   prometheus:
     image: prom/prometheus:latest
