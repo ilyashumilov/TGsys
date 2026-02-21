@@ -209,7 +209,9 @@ services:
           memory: 256M
 
   task_result_service:
-    build: ./services/task_result_service
+    build:
+      context: .
+      dockerfile: ./services/task_result_service/Dockerfile
     container_name: task_result_service
     env_file: .env
     depends_on:
