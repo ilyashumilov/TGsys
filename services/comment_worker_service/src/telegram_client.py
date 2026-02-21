@@ -106,7 +106,7 @@ class TelegramCommentClient:
             
             # Post comment as reply
             if linked_id:
-                await self._client.send_message(linked_id, comment_text, reply_to_msg_id=message.id)
+                await self._client.send_message(linked_id, comment_text, reply_to=message.id)
             else:
                 await message.reply(comment_text)
             
