@@ -43,6 +43,8 @@ class TelegramCommentClient:
                     )
 
             loader = TDataSessionLoader(self.tdata_path, self.session_file)
+            
+            self._logger.info(f"self.tdata_path: {self.tdata_path}")
             self._client = await loader.load_client()
 
             await self._client.PrintSessions()
