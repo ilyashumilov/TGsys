@@ -97,6 +97,15 @@ class TelegramCommentClient:
                 self._logger.info(f"Joined channel {channel_username}")
             except Exception as e:
                 self._logger.warning(f"Failed to join channel {channel_username}: {e}")
+
+            # Join linked discussion group if exists
+            if linked_id:
+                try:
+                    chat_linked = await self._client.get_entity(linked_id)
+                    await self._client(JoinChannelRequest(chat_linked))
+                    self._logger.info(f"Joined discussion group {linked_id}")
+                except Exception as e:
+                    self._logger.warning(f"Failed to join discussion group {linked_id}: {e}")
             
             # Get the message to comment to
             message = await self._client.get_messages(chat, ids=message_id)
