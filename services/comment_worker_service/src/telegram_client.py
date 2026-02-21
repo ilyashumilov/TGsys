@@ -106,9 +106,9 @@ class TelegramCommentClient:
             # Don't retry immediately, let the system handle it
             return False
             
-        except ChatWriteForbiddenError:
-            self._logger.error("Cannot write to this chat (permissions revoked)")
-            return False
+        # except ChatWriteForbiddenError:
+            # self._logger.error("Cannot write to this chat (permissions revoked)")
+            # return False
             
         except (UserDeactivatedBanError, UserDeactivatedError, PhoneNumberBannedError):
             self._logger.error("Account is banned or deactivated")
