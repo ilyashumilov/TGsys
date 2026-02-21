@@ -12,7 +12,7 @@ async def main():
     Example usage of TDataSessionLoader.
     """
     # Initialize the loader with tdata path and session name
-    loader = TDataSessionLoader("sessions/tdata/channel_parser/tdata", "channel_parser.session")
+    loader = TDataSessionLoader("sessions/tdata/account1/tdata", "account1.session")
     
     # Load and get the client
     client = await loader.load_client()
