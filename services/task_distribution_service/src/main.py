@@ -346,7 +346,7 @@ class TaskDistributionService:
                         # Check for available account
                         account = await self._db.get_available_account(
                             min_health_score=self._app_config.min_health_score,
-                            cooldown_hours=self._app_config.cooldown_hours
+                            cooldown_minutes=self._app_config.cooldown_minutes
                         )
                         
                         if account:
