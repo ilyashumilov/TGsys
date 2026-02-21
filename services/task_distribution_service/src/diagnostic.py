@@ -52,7 +52,7 @@ async def test_postgres_connection():
             # Check available accounts
             available = await client.get_available_accounts_list(
                 min_health_score=70, 
-                cooldown_hours=1
+                cooldown_minutes=18  # 18 minutes default
             )
             print(f"   📊 {len(available)} accounts available for tasks")
             
@@ -117,7 +117,7 @@ async def test_configuration():
         
         print(f"   Log Level: {app_config.log_level}")
         print(f"   Min Health Score: {app_config.min_health_score}")
-        print(f"   Cooldown Hours: {app_config.cooldown_hours}")
+        print(f"   Cooldown Minutes: {app_config.cooldown_minutes}")
         print(f"   Max Retries: {app_config.max_retries}")
         print(f"   Retry Delay: {app_config.retry_delay}")
         

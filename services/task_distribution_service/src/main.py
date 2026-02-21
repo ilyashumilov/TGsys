@@ -166,7 +166,7 @@ class TaskDistributionService:
             try:
                 available_accounts = await self._db.get_available_accounts_list(
                     min_health_score=self._app_config.min_health_score,
-                    cooldown_hours=self._app_config.cooldown_hours
+                    cooldown_minutes=self._app_config.cooldown_minutes
                 )
                 
                 if available_accounts:
@@ -194,7 +194,7 @@ class TaskDistributionService:
                 # Find best available account
                 account = await self._db.get_available_account(
                     min_health_score=self._app_config.min_health_score,
-                    cooldown_hours=self._app_config.cooldown_hours
+                    cooldown_minutes=self._app_config.cooldown_minutes
                 )
                 
             except Exception as db_error:
@@ -268,7 +268,7 @@ class TaskDistributionService:
                     f"   ├─ Channel: {channel_identifier}\n"
                     f"   ├─ Message ID: {message_id}\n"
                     f"   ├─ Required Health Score: >{self._app_config.min_health_score}\n"
-                    f"   ├─ Cooldown Period: {self._app_config.cooldown_hours}h\n"
+                    f"   ├─ Cooldown Period: {self._app_config.cooldown_minutes} minutes\n"
                     f"   └─ Status: Task stored for periodic retry"
                 )
                 

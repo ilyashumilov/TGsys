@@ -46,7 +46,7 @@ class PostgresClient:
             await self._pool.close()
             self._logger.info("PostgreSQL connection closed")
 
-    async def get_available_account(self, min_health_score: int, cooldown_hours: int) -> Optional[Dict[str, Any]]:
+    async def get_available_account(self, min_health_score: int, cooldown_minutes: float) -> Optional[Dict[str, Any]]:
         """Get best available account based on health and load balancing."""
         if not self._pool:
             raise RuntimeError("Not connected to database")
@@ -61,16 +61,16 @@ class PostgresClient:
               AND session_status = 'authorized'
               AND health_score >= $1
               AND (last_comment_time IS NULL 
-                   OR last_comment_time < NOW() - INTERVAL '%s hours')
+                   OR last_comment_time < NOW() - INTERVAL '%s minutes')
             ORDER BY comments_count ASC, health_score DESC
             LIMIT 1
-        """ % cooldown_hours
+        """ % cooldown_minutes
         
         async with self._pool.acquire() as conn:
             row = await conn.fetchrow(query, min_health_score)
             return dict(row) if row else None
 
-    async def get_available_accounts_list(self, min_health_score: int, cooldown_hours: int) -> List[Dict[str, Any]]:
+    async def get_available_accounts_list(self, min_health_score: int, cooldown_minutes: float) -> List[Dict[str, Any]]:
         """Get list of all available accounts for logging purposes."""
         if not self._pool:
             raise RuntimeError("Not connected to database")
@@ -85,10 +85,10 @@ class PostgresClient:
               AND session_status = 'authorized'
               AND health_score >= $1
               AND (last_comment_time IS NULL 
-                   OR last_comment_time < NOW() - INTERVAL '%s hours')
+                   OR last_comment_time < NOW() - INTERVAL '%s minutes')
             ORDER BY comments_count ASC, health_score DESC
             LIMIT 10
-        """ % cooldown_hours
+        """ % cooldown_minutes
         
         async with self._pool.acquire() as conn:
             rows = await conn.fetch(query, min_health_score)

@@ -44,7 +44,7 @@ class KafkaConfig:
 class AppConfig:
     log_level: str = "INFO"
     min_health_score: int = 70
-    cooldown_hours: int = 1
+    cooldown_minutes: float = 18.0  # Changed to minutes (was 0.3 hours)
     max_retries: int = 3
     retry_delay: int = 5  # seconds
 
@@ -53,7 +53,7 @@ class AppConfig:
         return cls(
             log_level=os.getenv("LOG_LEVEL", "INFO"),
             min_health_score=int(os.getenv("MIN_HEALTH_SCORE", "70")),
-            cooldown_hours=int(os.getenv("COOLDOWN_HOURS", "1")),
+            cooldown_minutes=float(os.getenv("COOLDOWN_MINUTES", "2")),  # Changed env var name
             max_retries=int(os.getenv("MAX_RETRIES", "3")),
             retry_delay=int(os.getenv("RETRY_DELAY", "5")),
         )
