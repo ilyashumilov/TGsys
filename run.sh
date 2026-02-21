@@ -13,7 +13,7 @@ docker-compose build
 
 # Пересобираем образ воркера
 echo "Пересобираем образ воркера..."
-docker build --no-cache -f services/comment_worker_service/Dockerfile -t comment_worker_service:latest .
+docker build --no-cache -f services/comment_worker_service/Dockerfile -t tgsys_comment_worker_service:latest .
 
 # Поднимаем систему в фоне
 echo "Запускаем систему в фоне..."
