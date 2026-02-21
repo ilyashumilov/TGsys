@@ -13,6 +13,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy source code
 COPY src/ ./src/
+COPY services ./services
 
 # Create sessions directory
 RUN mkdir -p /app/sessions
