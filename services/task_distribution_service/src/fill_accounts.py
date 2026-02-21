@@ -92,7 +92,7 @@ async def fill_accounts(session_dir: str, proxies_csv: str):
     db = PostgresClient(PostgresConnection(
         host=pg_config.host,
         port=pg_config.port,
-        db=pg_config.db,
+        database=pg_config.db,
         user=pg_config.user,
         password=pg_config.password,
     ))
