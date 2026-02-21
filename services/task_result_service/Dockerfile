@@ -13,6 +13,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy source code and shared module
 COPY services/task_result_service/src/ ./src/
 COPY shared ./shared
+COPY postgres ./postgres
+COPY kafka ./kafka
 
 # Command
 CMD ["python", "src/main.py"]

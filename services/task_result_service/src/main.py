@@ -27,7 +27,7 @@ class TaskResultService:
         
         # Initialize components
         self._kafka_client: KafkaResultClient | None = None
-        self._postgres_client: PostgresClient | None = None
+        self._postgres_client: PostgresResultClient | None = None
         
         self._running = False
 
@@ -104,7 +104,7 @@ class TaskResultService:
             
             if success:
                 # Update database
-                await self._update_account_stats(account_id)
+                self._update_account_stats(account_id)
                 self._logger.info(f"✅ Updated stats for account {account_id}")
             else:
                 # Resend task to worker
@@ -118,7 +118,7 @@ class TaskResultService:
             self._logger.error(f"Error handling result for task {task_id}: {e}")
             raise
 
-    async def _update_account_stats(self, account_id: int) -> None:
+    def _update_account_stats(self, account_id: int) -> None:
         """Update account comments_count and last_comment_time."""
         sql = """
         UPDATE telegram_accounts 
