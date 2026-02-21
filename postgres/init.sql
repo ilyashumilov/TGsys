@@ -84,6 +84,36 @@ CREATE INDEX idx_telegram_accounts_cooldown ON public.telegram_accounts USING bt
 
 CREATE INDEX idx_telegram_accounts_selection ON public.telegram_accounts USING btree (last_comment_time, comments_count, health_score) WHERE ((is_active = true) AND (health_score > 70));
 
+CREATE TABLE public.pending_tasks (
+    id bigint NOT NULL,
+    channel_id bigint NOT NULL,
+    message_id bigint NOT NULL,
+    channel_identifier text NOT NULL,
+    post_text text,
+    post_date text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    retry_count integer DEFAULT 0 NOT NULL
+);
+
+CREATE SEQUENCE public.pending_tasks_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+ALTER SEQUENCE public.pending_tasks_id_seq OWNED BY public.pending_tasks.id;
+
+ALTER TABLE ONLY public.pending_tasks ALTER COLUMN id SET DEFAULT nextval('public.pending_tasks_id_seq'::regclass);
+
+ALTER TABLE ONLY public.pending_tasks
+    ADD CONSTRAINT pending_tasks_pkey PRIMARY KEY (id);
+
+CREATE INDEX idx_pending_tasks_created ON public.pending_tasks USING btree (created_at);
+
+CREATE TRIGGER update_pending_tasks_updated_at BEFORE UPDATE ON public.pending_tasks FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
 CREATE INDEX idx_telegram_channels_active ON public.telegram_channels USING btree (is_active, created_at) WHERE (is_active = true);
 
 CREATE TRIGGER update_telegram_channels_updated_at BEFORE UPDATE ON public.telegram_channels FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
