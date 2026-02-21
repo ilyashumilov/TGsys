@@ -72,13 +72,8 @@ class TelegramCommentClient:
             raise RuntimeError("Client not connected")
         
         try:
-            # Handle both usernames and chat_ids
-            if channel_username.isdigit():
-                # Private channel: use chat_id
-                chat = await self._client.get_entity(int(channel_username))
-            else:
-                # Public channel: use username
-                chat = channel_username
+            # Get the channel entity
+            chat = await self._client.get_entity(channel_username)
             
             # Join public channels if not already joined
             if hasattr(chat, 'username') and chat.username:
