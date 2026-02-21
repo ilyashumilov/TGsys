@@ -74,7 +74,10 @@ class TelegramCommentClient:
         try:
             # Get the channel entity
             chat = await self._client.get_entity(channel_username)
-            
+
+            self._logger.info("Chat: %s", chat)
+            self._logger.info("Chat hasattr(chat, 'username'): %s", hasattr(chat, 'username'))
+
             # Join public channels if not already joined
             if hasattr(chat, 'username') and chat.username:
                 try:
