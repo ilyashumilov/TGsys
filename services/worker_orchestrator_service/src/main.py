@@ -98,12 +98,7 @@ class WorkerOrchestrator:
         """Deploy workers for all accounts found in tdata folder."""
         if not self._session_manager or not self._docker_manager:
             raise RuntimeError("Service not properly initialized")
-        
-        # Build worker image
-        self._logger.info("Building worker image...")
-        self._docker_manager.client.images.build(path=".", dockerfile="services/comment_worker_service/Dockerfile", tag="comment_worker_service:latest", nocache=True)
-        self._logger.info("Worker image built successfully")
-        
+
         try:
             from pathlib import Path
             tdata_dir = Path(self._app_config.sessions_dir) / "tdata"
