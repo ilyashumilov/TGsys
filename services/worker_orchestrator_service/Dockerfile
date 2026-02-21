@@ -13,7 +13,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy source code
 COPY src/ ./src/
-COPY services/comment_worker_service/Dockerfile services/comment_worker_service/Dockerfile
 
 # Create sessions directory
 RUN mkdir -p /app/sessions
