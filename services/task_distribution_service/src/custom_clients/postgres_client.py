@@ -127,3 +127,70 @@ class PostgresClient:
         async with self._pool.acquire() as conn:
             result = await conn.execute(query, account_id)
             return result == "UPDATE 1"
+
+    async def insert_pending_task(
+        self, 
+        channel_id: int, 
+        message_id: int, 
+        channel_identifier: str,
+        post_text: str = "",
+        post_date: str = ""
+    ) -> int:
+        """Insert a pending task for retry."""
+        if not self._pool:
+            raise RuntimeError("Not connected to database")
+        
+        query = """
+            INSERT INTO pending_tasks (channel_id, message_id, channel_identifier, post_text, post_date)
+            VALUES ($1, $2, $3, $4, $5)
+            RETURNING id
+        """
+        
+        async with self._pool.acquire() as conn:
+            row = await conn.fetchrow(query, channel_id, message_id, channel_identifier, post_text, post_date)
+            return row['id'] if row else 0
+
+    async def get_pending_tasks(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """Get oldest pending tasks for retry."""
+        if not self._pool:
+            raise RuntimeError("Not connected to database")
+        
+        query = """
+            SELECT id, channel_id, message_id, channel_identifier, post_text, post_date, retry_count, created_at
+            FROM pending_tasks
+            ORDER BY created_at ASC
+            LIMIT $1
+        """
+        
+        async with self._pool.acquire() as conn:
+            rows = await conn.fetch(query, limit)
+            return [dict(row) for row in rows]
+
+    async def delete_pending_task(self, task_id: int) -> bool:
+        """Delete a pending task after successful assignment."""
+        if not self._pool:
+            raise RuntimeError("Not connected to database")
+        
+        query = """
+            DELETE FROM pending_tasks
+            WHERE id = $1
+        """
+        
+        async with self._pool.acquire() as conn:
+            result = await conn.execute(query, task_id)
+            return result == "DELETE 1"
+
+    async def increment_pending_task_retry(self, task_id: int) -> bool:
+        """Increment retry count for a pending task."""
+        if not self._pool:
+            raise RuntimeError("Not connected to database")
+        
+        query = """
+            UPDATE pending_tasks
+            SET retry_count = retry_count + 1, updated_at = NOW()
+            WHERE id = $1
+        """
+        
+        async with self._pool.acquire() as conn:
+            result = await conn.execute(query, task_id)
+            return result == "UPDATE 1"

@@ -35,6 +35,7 @@ class TaskDistributionService:
         
         self._running = False
         self._task_counter = 0
+        self._retry_task: asyncio.Task | None = None
 
     async def start(self) -> None:
         """Start task distribution service."""
@@ -73,6 +74,7 @@ class TaskDistributionService:
             
             # Start processing messages
             self._running = True
+            self._retry_task = asyncio.create_task(self._retry_pending_tasks())
             await self._process_messages()
             
         except Exception as e:
@@ -84,6 +86,14 @@ class TaskDistributionService:
         self._logger.info("Stopping Task Distribution Service...")
         
         self._running = False
+        
+        # Cancel retry task
+        if self._retry_task:
+            self._retry_task.cancel()
+            try:
+                await self._retry_task
+            except asyncio.CancelledError:
+                pass
         
         # Close connections
         if self._consumer:
@@ -259,13 +269,30 @@ class TaskDistributionService:
                     f"   ├─ Message ID: {message_id}\n"
                     f"   ├─ Required Health Score: >{self._app_config.min_health_score}\n"
                     f"   ├─ Cooldown Period: {self._app_config.cooldown_hours}h\n"
-                    f"   └─ Status: Task queued for retry when accounts available"
+                    f"   └─ Status: Task stored for periodic retry"
                 )
+                
+                # Store task for retry
+                try:
+                    task_id = await self._db.insert_pending_task(
+                        channel_id=channel_id,
+                        message_id=message_id,
+                        channel_identifier=channel_identifier,
+                        post_text=post_text,
+                        post_date=post_date
+                    )
+                    self._logger.info(f" Task stored with ID {task_id} for retry")
+                except Exception as db_error:
+                    self._logger.error(f" Failed to store pending task: {db_error}")
+                
                 # Only increment pending tasks when no accounts are available
                 if self._metrics_exporter:
                     # Get current pending count and increment by 1
                     current_pending = self._metrics_exporter.pending_tasks_gauge._value._value if hasattr(self._metrics_exporter.pending_tasks_gauge, '_value') else 0
                     self._metrics_exporter.update_pending_tasks(current_pending + 1)
+            
+            # Always commit the message
+            await self._consumer.commit_message(message)
             
         except Exception as e:
             self._logger.error(f"Error handling message: {e}")
@@ -273,8 +300,6 @@ class TaskDistributionService:
             if self._metrics_exporter:
                 self._metrics_exporter.update_pending_tasks(1)
             
-            # Commit message regardless of task assignment
-            await self._consumer.commit_message(message)
             
             # Log final status
             if account:
@@ -291,13 +316,112 @@ class TaskDistributionService:
                     f"🏁 TASK PROCESSING COMPLETED\n"
                     f"   ├─ Channel: {channel_identifier}\n"
                     f"   ├─ Message ID: {message_id}\n"
-                    f"   ├─ Status: No accounts available - task will be retried\n"
-                    f"   └─ Next: Waiting for available accounts"
+                    f"   ├─ Status: Task stored for retry\n"
+                    f"   └─ Next: Background retry will attempt assignment"
                 )
             
         except Exception as e:
             self._logger.error(f"Error handling message: {e}")
             raise
+
+    async def _retry_pending_tasks(self) -> None:
+        """Periodically retry pending tasks that couldn't be assigned initially."""
+        retry_interval = 60  # seconds
+        self._logger.info(f"Starting pending tasks retry loop (every {retry_interval}s)")
+        
+        while self._running:
+            try:
+                await asyncio.sleep(retry_interval)
+                
+                # Get pending tasks (oldest first)
+                pending_tasks = await self._db.get_pending_tasks(limit=10)
+                
+                if not pending_tasks:
+                    continue
+                
+                self._logger.info(f"🔄 Retrying {len(pending_tasks)} pending tasks...")
+                
+                for task in pending_tasks:
+                    try:
+                        # Check for available account
+                        account = await self._db.get_available_account(
+                            min_health_score=self._app_config.min_health_score,
+                            cooldown_hours=self._app_config.cooldown_hours
+                        )
+                        
+                        if account:
+                            # Generate new task ID for this retry attempt
+                            task_id = f"retry_{task['id']}_{self._task_counter}"
+                            self._task_counter += 1
+                            
+                            self._logger.info(
+                                f"🎯 RETRY ASSIGNMENT: Task {task['id']} -> Account {account['id']}\n"
+                                f"   ├─ Channel: {task['channel_identifier']}\n"
+                                f"   ├─ Message ID: {task['message_id']}\n"
+                                f"   ├─ Retry Count: {task['retry_count']}\n"
+                                f"   └─ Publishing to comment queue..."
+                            )
+                            
+                            # Record task assignment
+                            if self._metrics_exporter:
+                                self._metrics_exporter.record_task_assigned(task_id, str(account['id']))
+                            
+                            # Assign task to account
+                            success = await self._producer.publish_comment_task(
+                                account_id=account['id'],
+                                channel_id=task['channel_id'],
+                                message_id=task['message_id'],
+                                channel_identifier=task['channel_identifier']
+                            )
+                            
+                            if success:
+                                self._logger.info(
+                                    f"✅ RETRY SUCCESSFUL\n"
+                                    f"   ├─ Task {task['id']} assigned to Account {account['id']}\n"
+                                    f"   ├─ Channel: {task['channel_identifier']}\n"
+                                    f"   └─ Removing from pending tasks"
+                                )
+                                
+                                # Remove from pending tasks
+                                await self._db.delete_pending_task(task['id'])
+                                
+                                # Update metrics - decrement pending tasks
+                                if self._metrics_exporter:
+                                    current_pending = self._metrics_exporter.pending_tasks_gauge._value._value if hasattr(self._metrics_exporter.pending_tasks_gauge, '_value') else 0
+                                    self._metrics_exporter.update_pending_tasks(max(0, current_pending - 1))
+                                    self._metrics_exporter.record_task_completion(str(account['id']), 1.0, success=True)
+                            else:
+                                self._logger.error(
+                                    f"❌ RETRY PUBLICATION FAILED\n"
+                                    f"   ├─ Task {task['id']}\n"
+                                    f"   ├─ Account {account['id']}\n"
+                                    f"   └─ Keeping in pending tasks"
+                                )
+                                # Reduce health score for failed task assignment
+                                try:
+                                    await self._db.update_account_health(account['id'], -5)
+                                except:
+                                    pass
+                                # Increment retry count
+                                await self._db.increment_pending_task_retry(task['id'])
+                                if self._metrics_exporter:
+                                    self._metrics_exporter.record_task_completion(str(account['id']), 1.0, success=False)
+                        else:
+                            # No account available, increment retry count
+                            await self._db.increment_pending_task_retry(task['id'])
+                            self._logger.debug(f"No accounts available for pending task {task['id']}, retry count now {task['retry_count'] + 1}")
+                            
+                    except Exception as task_error:
+                        self._logger.error(f"Error retrying task {task['id']}: {task_error}")
+                        # Still increment retry count on error
+                        try:
+                            await self._db.increment_pending_task_retry(task['id'])
+                        except:
+                            pass
+                            
+            except Exception as e:
+                self._logger.error(f"Error in pending tasks retry loop: {e}")
+                # Continue the loop despite errors
 
 
 async def main() -> None:

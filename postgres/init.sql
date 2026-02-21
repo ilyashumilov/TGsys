@@ -117,4 +117,3 @@ CREATE TRIGGER update_pending_tasks_updated_at BEFORE UPDATE ON public.pending_t
 CREATE INDEX idx_telegram_channels_active ON public.telegram_channels USING btree (is_active, created_at) WHERE (is_active = true);
 
 CREATE TRIGGER update_telegram_channels_updated_at BEFORE UPDATE ON public.telegram_channels FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
-
