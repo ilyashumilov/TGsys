@@ -93,7 +93,10 @@ class TelegramCommentClient:
                 return False
             
             # Post comment as reply
-            await message.reply(comment_text)
+            if hasattr(chat, 'linked_chat_id') and chat.linked_chat_id:
+                await self._client.send_message(chat.linked_chat_id, comment_text, reply_to_msg_id=message.id)
+            else:
+                await message.reply(comment_text)
             
             self._logger.info(
                 f"✅ Posted comment to {channel_username}:{message_id} "
