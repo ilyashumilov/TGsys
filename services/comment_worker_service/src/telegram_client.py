@@ -79,12 +79,12 @@ class TelegramCommentClient:
             self._logger.info("Chat hasattr(chat, 'username'): %s", hasattr(chat, 'username'))
 
             # Join public channels if not already joined
-            if hasattr(chat, 'username') and chat.username:
-                try:
-                    await self._client(JoinChannelRequest(chat))
-                    self._logger.info(f"Joined channel {channel_username}")
-                except Exception as e:
-                    self._logger.warning(f"Failed to join channel {channel_username}: {e}")
+            # if hasattr(chat, 'username') and chat.username:
+            try:
+                await self._client(JoinChannelRequest(chat))
+                self._logger.info(f"Joined channel {channel_username}")
+            except Exception as e:
+                self._logger.warning(f"Failed to join channel {channel_username}: {e}")
             
             # Get the message to comment to
             message = await self._client.get_messages(chat, ids=message_id)
