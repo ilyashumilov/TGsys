@@ -5,7 +5,7 @@ import logging
 import sys
 from typing import Optional
 from telethon import TelegramClient
-from telethon.tl.functions.channels import JoinChannelRequest
+from telethon.tl.functions.channels import JoinChannelRequest, GetFullChannelRequest
 from telethon.errors import FloodWaitError, ChatWriteForbiddenError, UserDeactivatedBanError, UserDeactivatedError, PhoneNumberBannedError, AuthKeyUnregisteredError
 
 from shared.telegram_session_loader import TDataSessionLoader
@@ -78,6 +78,19 @@ class TelegramCommentClient:
             self._logger.info("Chat: %s", chat)
             self._logger.info("Chat hasattr(chat, 'username'): %s", hasattr(chat, 'username'))
 
+
+
+            self._logger.info("hasattr(chat, 'broadcast'): %s", hasattr(chat, 'broadcast')chat)
+            self._logger.info("Chat chat.broadcast(chat, 'username'): %s", chat.broadcast)
+
+
+            # Get linked chat ID if it's a channel with discussions
+            linked_id = None
+            if hasattr(chat, 'broadcast') and chat.broadcast:
+                full = await self._client(GetFullChannelRequest(chat))
+                linked_id = full.full_chat.linked_chat_id
+                self._logger.info("Linked chat ID: %s", linked_id)
+
             # Join public channels if not already joined
             # if hasattr(chat, 'username') and chat.username:
             try:
@@ -92,12 +105,9 @@ class TelegramCommentClient:
                 self._logger.error(f"Message {message_id} not found in {channel_username}")
                 return False
             
-            self._logger.info("hasattr(chat, 'linked_chat_id'): %s", hasattr(chat, 'linked_chat_id'))
-            self._logger.info("chat.linked_chat_id: %s", chat.linked_chat_id)
-
             # Post comment as reply
-            if hasattr(chat, 'linked_chat_id') and chat.linked_chat_id:
-                await self._client.send_message(chat.linked_chat_id, comment_text, reply_to_msg_id=message.id)
+            if linked_id:
+                await self._client.send_message(linked_id, comment_text, reply_to_msg_id=message.id)
             else:
                 await message.reply(comment_text)
             
