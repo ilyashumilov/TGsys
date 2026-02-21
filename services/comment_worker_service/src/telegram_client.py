@@ -78,34 +78,13 @@ class TelegramCommentClient:
             self._logger.info("Chat: %s", chat)
             self._logger.info("Chat hasattr(chat, 'username'): %s", hasattr(chat, 'username'))
 
-
-            self._logger.info("hasattr(chat, 'broadcast'): %s", hasattr(chat, 'broadcast'))
-            self._logger.info("Chat chat.broadcast(chat, 'username'): %s", chat.broadcast)
-
-
-            # Get linked chat ID if it's a channel with discussions
-            linked_id = None
-            if hasattr(chat, 'broadcast') and chat.broadcast:
-                full = await self._client(GetFullChannelRequest(chat))
-                linked_id = full.full_chat.linked_chat_id
-                self._logger.info("Linked chat ID: %s", linked_id)
-
             # Join public channels if not already joined
-            # if hasattr(chat, 'username') and chat.username:
-            try:
-                await self._client(JoinChannelRequest(chat))
-                self._logger.info(f"Joined channel {channel_username}")
-            except Exception as e:
-                self._logger.warning(f"Failed to join channel {channel_username}: {e}")
-
-            # Join linked discussion group if exists
-            if linked_id:
+            if hasattr(chat, 'username') and chat.username:
                 try:
-                    chat_linked = await self._client.get_entity(linked_id)
-                    await self._client(JoinChannelRequest(chat_linked))
-                    self._logger.info(f"Joined discussion group {linked_id}")
+                    await self._client(JoinChannelRequest(chat))
+                    self._logger.info(f"Joined channel {channel_username}")
                 except Exception as e:
-                    self._logger.warning(f"Failed to join discussion group {linked_id}: {e}")
+                    self._logger.warning(f"Failed to join channel {channel_username}: {e}")
             
             # Get the message to comment to
             message = await self._client.get_messages(chat, ids=message_id)
@@ -113,11 +92,8 @@ class TelegramCommentClient:
                 self._logger.error(f"Message {message_id} not found in {channel_username}")
                 return False
             
-            # Post comment as reply
-            if linked_id:
-                await self._client.send_message(linked_id, comment_text, reply_to=message.id)
-            else:
-                await message.reply(comment_text)
+            # Post comment using comment_to
+            await self._client.send_message(chat, comment_text, comment_to=message)
             
             self._logger.info(
                 f"✅ Posted comment to {channel_username}:{message_id} "
