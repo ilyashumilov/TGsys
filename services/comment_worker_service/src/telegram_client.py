@@ -79,8 +79,7 @@ class TelegramCommentClient:
             self._logger.info("Chat hasattr(chat, 'username'): %s", hasattr(chat, 'username'))
 
 
-
-            self._logger.info("hasattr(chat, 'broadcast'): %s", hasattr(chat, 'broadcast')chat)
+            self._logger.info("hasattr(chat, 'broadcast'): %s", hasattr(chat, 'broadcast'))
             self._logger.info("Chat chat.broadcast(chat, 'username'): %s", chat.broadcast)
 
 
