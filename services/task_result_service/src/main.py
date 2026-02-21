@@ -7,8 +7,8 @@ import sys
 from typing import Dict, Any
 
 from config import AppConfig, KafkaConfig, PostgresConfig, setup_logging
-from shared.postgres.client import PostgresClient
-from kafka_client import KafkaResultClient
+from custom_clients.postgres_client import PostgresResultClient
+from custom_clients.kafka_client import KafkaResultClient
 
 
 class TaskResultService:
@@ -41,7 +41,7 @@ class TaskResultService:
             await asyncio.sleep(self._kafka_config.consumer_start_delay)
             
             # Initialize Postgres client
-            self._postgres_client = PostgresClient(self._postgres_config.to_connection())
+            self._postgres_client = PostgresResultClient(self._postgres_config.to_connection())
             
             # Initialize Kafka client
             self._kafka_client = KafkaResultClient(
