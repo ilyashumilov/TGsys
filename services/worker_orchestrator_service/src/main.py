@@ -132,11 +132,11 @@ class WorkerOrchestrator:
         
         account_id = account['id']
         
-        # Create session file if needed
-        session_path = await self._session_manager.create_session_for_account(
-            account_name=account['account_name'],
-            phone_number=account.get('phone_number')
-        )
+        # # Create session file if needed
+        # session_path = await self._session_manager.create_session_for_account(
+        #     account_name=account['account_name'],
+        #     phone_number=account.get('phone_number')
+        # )
         
         # Deploy worker container
         await self._docker_manager.deploy_worker_for_account(
