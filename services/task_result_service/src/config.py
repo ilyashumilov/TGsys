@@ -42,7 +42,7 @@ class PostgresConfig:
         )
 
     def to_connection(self) -> "PostgresConnection":
-        from shared.postgres.client import PostgresConnection
+        from postgres.client import PostgresConnection
         return PostgresConnection(
             host=self.host,
             port=self.port,
